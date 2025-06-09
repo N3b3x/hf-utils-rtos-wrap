@@ -60,7 +60,7 @@ SignalSemaphore::~SignalSemaphore()
 {
     if (initialized)
     {
-        DeleteTxSemaphore(&semaphore);
+        os_semaphore_delete_ex(&semaphore);
     }
 }
 
@@ -73,7 +73,7 @@ bool SignalSemaphore::WaitUntilSignalled(uint32_t msecToWait) noexcept
 {
     if (EnsureInitialized())
     {
-        return (GetTxSemaphore(&semaphore, msecToWait));
+        return (os_semaphore_get_ex(&semaphore, msecToWait));
     }
     return false;
 }
@@ -86,7 +86,7 @@ bool SignalSemaphore::Signal() noexcept
 {
     if (EnsureInitialized())
     {
-        PutTxSemaphore(&semaphore);
+        os_semaphore_put_ex(&semaphore);
         return true;
     }
     return false;
@@ -100,7 +100,7 @@ bool SignalSemaphore::IsSignalled() noexcept
 {
     if (EnsureInitialized())
     {
-        ULONG currentValue = GetTxSemaphoreCount(&semaphore);
+        OS_Ulong currentValue = os_semaphore_get_count_ex(&semaphore);
         return (currentValue > 0);
     }
     return false;
@@ -132,7 +132,7 @@ bool SignalSemaphore::EnsureInitialized() noexcept
 {
     if (!initialized)
     {
-        initialized = CreateTxSemaphore(&semaphore, name, 0);
+        initialized = os_semaphore_create_ex(&semaphore, name, 0);
     }
     return initialized;
 }

@@ -15,7 +15,7 @@
 #define SIGNALSEMAPHORE_H
 
 #include <stdint.h>
-#include "UTILITIES/common/TxUtility.h"
+#include "OsUtility.h"
 #include <cstdio>
 
 /**
@@ -51,7 +51,7 @@ public:
      * @param msecToWait Maximum time to wait in milliseconds.
      * @return True if the semaphore was successfully acquired, false otherwise.
      */
-    bool WaitUntilSignalled(uint32_t msecToWait = TX_WAIT_FOREVER) noexcept;
+    bool WaitUntilSignalled(uint32_t msecToWait = OS_WAIT_FOREVER) noexcept;
 
     /**
      * @brief Signals the semaphore.
@@ -87,7 +87,7 @@ private:
 
     static constexpr uint32_t MaxNameLength = 39U;  ///< Maximum length of the semaphore name (excluding null terminator).
 
-    TX_SEMAPHORE semaphore;  ///< The semaphore object.
+    OS_Semaphore semaphore;  ///< The semaphore object.
     char name[MaxNameLength + 1];  ///< The name of the semaphore.
     bool initialized;  ///< Indicates whether the semaphore is initialized.
 };

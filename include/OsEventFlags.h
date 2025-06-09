@@ -2,30 +2,30 @@
   * Nebula Tech Corporation
   *
   * Copyright © 2023 Nebula Tech Corporation.   All Rights Reserved.
- * This file is part of HardFOC and is licensed under the GNU General Public License v3.0 or later.
+  * This file is part of HardFOC and is licensed under the GNU General Public License v3.0 or later.
   *
+  */
+#ifndef OS_EVENT_FLAGS_H_
+#define OS_EVENT_FLAGS_H_
 
-#ifndef UTILITIES_COMMON_THREADXEVENTFLAGS_H_
-#define UTILITIES_COMMON_THREADXEVENTFLAGS_H_
+#include "OsAbstraction.h"
 
-#include "UTILITIES/common/RtosCompat.h"
+#include "ConsolePort.h"
 
-#include "HAL/component_handlers/ConsolePort.h"
-
-#include "UTILITIES/common/ThingsToString.h"
-#include "UTILITIES/common/Utility.h"
-#include "UTILITIES/common/TxUtility.h"
+#include "ThingsToString.h"
+#include "Utility.h"
+#include "OsUtility.h"
 
 template <size_t groupSizeBytes>
-class ThreadXEventFlags {
+class OsEventFlags {
 public:
     /**
-     * @brief Construct a new ThreadXEventFlags object.
+     * @brief Construct a new OsEventFlags object.
      *
-     * The constructor does not initialize the ThreadX event flags or the mutex.
+     * The constructor does not initialize the OS event flags or the mutex.
      * The event flags and the mutex are initialized the first time an event is set or retrieved.
      */
-    ThreadXEventFlags(const char *groupName) :
+    OsEventFlags(const char *groupName) :
         initialized(false),
         groupCreated(false),
         mutexCreated(false),
@@ -35,17 +35,17 @@ public:
     }
 
     /**
-     * @brief Destroy the ThreadXEventFlags object.
+     * @brief Destroy the OsEventFlags object.
      *
      * If the event flags have been initialized, they are deleted.
      * If the mutex has been initialized, it is deleted.
      */
-    ~ThreadXEventFlags() {
+    ~OsEventFlags() {
         if (groupCreated) {
-            DeleteTxEventFlags(group);
+            os_event_flags_delete_ex(group);
         }
         if (mutexCreated) {
-            DeleteTxMutex(mtx);
+            os_mutex_delete_ex(mtx);
         }
     }
 
@@ -65,12 +65,12 @@ public:
      *
      * @param flagsToSet The flags to set.
      */
-    bool Set(ULONG flagsToSet) noexcept {
+    bool Set(OS_Ulong flagsToSet) noexcept {
         if (EnsureInitialized()) {
-            MutexGuard guard((TX_MUTEX*)&mtx);
-            return SetTxEventFlags(group, flagsToSet);
+            MutexGuard guard((OS_Mutex*)&mtx);
+            return os_event_flags_set_ex(group, flagsToSet);
         }
-        ConsolePort::WriteConditional(verbose, "ThreadXEventFlags::Set() - [%s] Event flags not initialized.", name);
+        ConsolePort::WriteConditional(verbose, "OsEventFlags::Set() - [%s] Event flags not initialized.", name);
         return false;
     }
 
@@ -81,13 +81,13 @@ public:
      *
      * @return The retrieved flags.
      */
-    bool Get(ULONG& flagsToGet, UINT getOption, ULONG wait_option = TX_NO_WAIT) noexcept {
-        ULONG actualFlags;
+    bool Get(OS_Ulong& flagsToGet, OS_Uint getOption, OS_Ulong wait_option = OS_NO_WAIT) noexcept {
+        OS_Ulong actualFlags;
         if (EnsureInitialized()) {
-            MutexGuard guard((TX_MUTEX*)&mtx);
-            return GetTxEventFlags(group, flagsToGet, getOption, actualFlags, wait_option);
+            MutexGuard guard((OS_Mutex*)&mtx);
+            return os_event_flags_get_ex(group, flagsToGet, getOption, actualFlags, wait_option);
         }
-        ConsolePort::WriteConditional(verbose, "ThreadXEventFlags::Get() - [%s] Event flags not initialized.", name);
+        ConsolePort::WriteConditional(verbose, "OsEventFlags::Get() - [%s] Event flags not initialized.", name);
         return false;
     }
 
@@ -95,22 +95,22 @@ private:
     bool Initialize() noexcept
     {
         if(!mutexCreated) {
-            mutexCreated = CreateTxMutex(mtx, mutexName, TX_INHERIT);
+            mutexCreated = os_mutex_create_ex(mtx, mutexName, OS_INHERIT);
         }
 
         if(!groupCreated) {
-            groupCreated = CreateTxEventFlags(group, name);
+            groupCreated = os_event_flags_create_ex(group, name);
         }
         return mutexCreated && groupCreated;
     }
 
     bool initialized; ///< Whether the event flags have been initialized
 
-    TX_EVENT_FLAGS_GROUP group; 	///< The ThreadX event flags
+    OS_EventGroup group; 	///< The OS event flags
     bool groupCreated;
     const char *name;
 
-    TX_MUTEX mtx;
+    OS_Mutex mtx;
     static const char mutexName[];
     bool mutexCreated;
 
@@ -119,8 +119,8 @@ private:
 };
 
 template <size_t groupSizeBytes>
-const char ThreadXEventFlags<groupSizeBytes>::mutexName[] = "ThreadXEventFlags-Mutex";
+const char OsEventFlags<groupSizeBytes>::mutexName[] = "OsEventFlags-Mutex";
 
 
 
-#endif /* UTILITIES_COMMON_THREADXEVENTFLAGS_H_ */
+#endif /* OS_EVENT_FLAGS_H_ */

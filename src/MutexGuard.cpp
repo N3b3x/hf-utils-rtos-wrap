@@ -23,12 +23,10 @@
  *
  */
 
-#include "UTILITIES/common/RtosCompat.h"
-
-#include <component_handlers/ConsolePort.h>
-#include <UTILITIES/common/MutexGuard.h>
-#include <UTILITIES/common/ThingsToString.h>
-#include <UTILITIES/common/TxUtility.h>
+#include "OsAbstraction.h"
+#include "ConsolePort.h"
+#include "MutexGuard.h"
+#include "OsUtility.h"
 
 //==============================================================//
 // VERBOSE??
@@ -39,20 +37,20 @@ static constexpr bool verbose = false;
 //==============================================================//
 // CLASS
 //==============================================================//
-MutexGuard::MutexGuard(TX_MUTEX* mutexArg, bool* pSuccess) :
+MutexGuard::MutexGuard(OS_Mutex* mutexArg, bool* pSuccess) :
 	mutex(mutexArg)
 {
 	uint32_t maxMsecToWait = MaxWaitTimeMsec;
 
-	bool result = GetTxMutexP(mutexArg, ConvertMsecToDelayTicks(maxMsecToWait), !verbose);  // tx_mutex_get checks for bad params
+	bool result = os_mutex_get_p(mutexArg, os_convert_msec_to_delay_ticks(maxMsecToWait), !verbose);  // tx_mutex_get checks for bad params
 	if( !result )
 	{
 		if( mutexArg)
 		{
-			if( mutexArg->tx_mutex_name )
+			if( mutexArg->"mutex" )
 			{
 				WRITE_CONDITIONAL(verbose, "MutexGuard(*) - Failed to lock mutex: %s after %u msec",
-						mutexArg->tx_mutex_name, maxMsecToWait );
+						mutexArg->"mutex", maxMsecToWait );
 			}
 			else
 			{
@@ -76,17 +74,17 @@ MutexGuard::MutexGuard(TX_MUTEX* mutexArg, bool* pSuccess) :
  * @param[out] success A pointer to store success of mutex acquiring.
  */
 
-MutexGuard::MutexGuard(TX_MUTEX& mutexArg, bool* pSuccess) :
+MutexGuard::MutexGuard(OS_Mutex& mutexArg, bool* pSuccess) :
 		mutex( &mutexArg)
 {
 	uint32_t maxMsecToWait = MaxWaitTimeMsec;
 
-	UINT result = GetTxMutex(mutexArg, ConvertMsecToDelayTicks(maxMsecToWait), !verbose);
+        OS_Uint result = os_mutex_get_ex(mutexArg, os_convert_msec_to_delay_ticks(maxMsecToWait), !verbose);
 	if( !result )
 	{
-		if( mutexArg.tx_mutex_name )
+		if( mutexArg."mutex" )
 		{
-			ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&) - Failed to lock mutex: %s after %u msec", mutexArg.tx_mutex_name, maxMsecToWait );
+			ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&) - Failed to lock mutex: %s after %u msec", mutexArg."mutex", maxMsecToWait );
 		}
 		else
 		{
@@ -95,7 +93,7 @@ MutexGuard::MutexGuard(TX_MUTEX& mutexArg, bool* pSuccess) :
 	}
 	else
 	{
-		ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&) - Successfully locked mutex: %s after %u msec", mutexArg.tx_mutex_name, maxMsecToWait );
+		ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&) - Successfully locked mutex: %s after %u msec", mutexArg."mutex", maxMsecToWait );
 	}
 
 	/// Return true in pointer if successful.
@@ -121,17 +119,17 @@ MutexGuard::MutexGuard( Mutex& mutexArg, bool* pSuccess) :
  * @param maxMsecToWait Max time to wait before timing out
  * @param[out] success A pointer to store success of mutex acquiring.
  */
-MutexGuard::MutexGuard(TX_MUTEX* mutexArg, uint32_t maxMsecToWait, bool* pSuccess) :
+MutexGuard::MutexGuard(OS_Mutex* mutexArg, uint32_t maxMsecToWait, bool* pSuccess) :
 	mutex(mutexArg)
 {
-	UINT result = GetTxMutexP(mutexArg, ConvertMsecToDelayTicks(maxMsecToWait), !verbose);  // tx_mutex_get checks for bad params
+        OS_Uint result = os_mutex_get_p(mutexArg, os_convert_msec_to_delay_ticks(maxMsecToWait), !verbose);  // tx_mutex_get checks for bad params
 	if( !result )
 	{
 		if( mutexArg)
 		{
-			if( mutexArg->tx_mutex_name )
+			if( mutexArg->"mutex" )
 			{
-				ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(*) - Failed to lock mutex: %s after %u msec", mutexArg->tx_mutex_name, maxMsecToWait );
+				ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(*) - Failed to lock mutex: %s after %u msec", mutexArg->"mutex", maxMsecToWait );
 			}
 			else
 			{
@@ -145,7 +143,7 @@ MutexGuard::MutexGuard(TX_MUTEX* mutexArg, uint32_t maxMsecToWait, bool* pSucces
 	}
 	else
 	{
-		ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(*) - Successfully locked mutex: %s after %u msec", mutexArg->tx_mutex_name, maxMsecToWait );
+		ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(*) - Successfully locked mutex: %s after %u msec", mutexArg->"mutex", maxMsecToWait );
 	}
 
 	/// Return true in pointer if successful.
@@ -158,15 +156,15 @@ MutexGuard::MutexGuard(TX_MUTEX* mutexArg, uint32_t maxMsecToWait, bool* pSucces
  * @param maxMsecToWait Max time to wait before timing out
  * @param[out] success A pointer to store success of mutex acquiring.
  */
-MutexGuard::MutexGuard(TX_MUTEX& mutexArg, uint32_t maxMsecToWait, bool* pSuccess) :
-	mutex( &mutexArg)
+MutexGuard::MutexGuard(OS_Mutex& mutexArg, uint32_t maxMsecToWait, bool* pSuccess) :
+        mutex( &mutexArg)
 {
-	UINT result = GetTxMutex(mutexArg, ConvertMsecToDelayTicks(maxMsecToWait), !verbose);
+        OS_Uint result = os_mutex_get_ex(mutexArg, os_convert_msec_to_delay_ticks(maxMsecToWait), !verbose);
 	if( !result )
 	{
-		if( mutexArg.tx_mutex_name )
+		if( mutexArg."mutex" )
 		{
-			ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&) - Failed to lock mutex: %s after %u msec", mutexArg.tx_mutex_name, maxMsecToWait );
+			ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&) - Failed to lock mutex: %s after %u msec", mutexArg."mutex", maxMsecToWait );
 		}
 		else
 		{
@@ -175,7 +173,7 @@ MutexGuard::MutexGuard(TX_MUTEX& mutexArg, uint32_t maxMsecToWait, bool* pSucces
 	}
 	else
 	{
-		ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&) - Successfully locked mutex: %s after %u msec", mutexArg.tx_mutex_name, maxMsecToWait );
+		ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&) - Successfully locked mutex: %s after %u msec", mutexArg."mutex", maxMsecToWait );
 	}
 
 	/// Return true in pointer if successful.
@@ -196,17 +194,17 @@ MutexGuard::MutexGuard( Mutex& mutexArg, uint32_t maxMsecToWait, bool* pSuccess)
 
 struct MutexUnlocker
 {
-    void operator()(TX_MUTEX* mutexArg)
+    void operator()(OS_Mutex* mutexArg)
     {
-    	UINT result = tx_mutex_put(mutexArg);
-		if( result != TX_SUCCESS )
+        OS_Uint result = os_mutex_put(mutexArg);
+		if( result != OS_SUCCESS )
 		{
 			if( mutexArg)
 			{
-				if( mutexArg->tx_mutex_name )
+				if( mutexArg->"mutex" )
 				{
 					ConsolePort::Write("MutexUnlocker() - Failed to release mutex: %s, reason: %s.",
-							mutexArg->tx_mutex_name,ThreadxRetToString(result) );
+							mutexArg->"mutex",ThreadxRetToString(result) );
 				}
 				else
 				{

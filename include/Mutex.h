@@ -16,7 +16,7 @@
 #define MUTEX_H
 
 #include <stdint.h>
-#include "UTILITIES/common/TxUtility.h"
+#include "OsUtility.h"
 
 class Mutex
 {
@@ -83,7 +83,7 @@ public:
     {
     	if ( !initialized )
     	{
-    		initialized = CreateTxMutex( mutex, mutexName );
+    		initialized = os_mutex_create_ex( mutex, mutexName );
     	}
     	return initialized;
     }
@@ -92,7 +92,7 @@ public:
   static constexpr uint32_t MaxNameLength = 39U;  // Not including null terminator
 private:
 
-    TX_MUTEX mutex;
+    OS_Mutex mutex;
     char mutexName[MaxNameLength + 1];
     bool initialized;
 

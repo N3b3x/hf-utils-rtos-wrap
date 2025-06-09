@@ -18,14 +18,11 @@
 #ifndef BaseThread_H
 #define BaseThread_H
 
-#include "UTILITIES/common/RtosCompat.h"
 #include <memory>
-
-#include "HAL/component_handlers/ConsolePort.h"
-
-#include "UTILITIES/common/TxUtility.h"
-#include "UTILITIES/common/CommonIDs.h"
-#include "UTILITIES/common/SignalSemaphore.h"
+#include "OsAbstraction.h"
+#include "ConsolePort.h"
+#include "OsUtility.h"
+#include "SignalSemaphore.h"
 
 /**
  * @class BaseThread
@@ -68,11 +65,11 @@ public:
     /**
      * @brief Get the pointer to the thread.
      *
-     * @return TX_THREAD* Pointer to the thread.
+     * @return OS_Thread* Pointer to the thread.
      */
-    TX_THREAD* GetThreadId() noexcept
+    OS_Thread* GetThreadId() noexcept
     {
-        return initialized ? &txThread : nullptr;
+        return initialized ? &osThread : nullptr;
     }
 
     /**
@@ -103,26 +100,26 @@ public:
     }
 
     /**
-      * @brief Suspend the underlying thread ThreadX task.
+      * @brief Suspend the underlying thread OS task.
       * @return True if action successful, false otherwise.
       */
     bool Suspend() noexcept;
 
     /**
-      * @brief Resume the underlying thread ThreadX task.
+      * @brief Resume the underlying thread OS task.
       * @return True if action successful, false otherwise.
       */
 
     bool Resume() noexcept;
 
     /**
-	 * @brief Check the status of the underlying thread ThreadX task.
+	 * @brief Check the status of the underlying thread OS task.
 	 * @return True if action successful, false otherwise.
 	 */
 
     bool IsSuspended() noexcept;
 
-    bool IsThreadCreated() noexcept { return txThreadCreated; }
+    bool IsThreadCreated() noexcept { return osThreadCreated; }
     bool IsThreadStopRequested() noexcept { return stopThreadRequested; }
     bool IsSetupComplete() const noexcept { return setupComplete; }
     bool IsThreadRunning() const noexcept { return threadRunning; }
@@ -222,6 +219,16 @@ public:
      */
     bool StopThreadAndWaitToVerify(uint32_t stopTimeoutMsec);
 
+    /**
+     * @brief Get the minimum remaining stack of the task.
+     */
+    uint32_t GetStackHighWaterMark() const noexcept;
+
+    /**
+     * @brief Change the running priority of the thread.
+     */
+    bool ChangePriority(uint32_t newPriority) noexcept;
+
 
 protected:
 
@@ -258,7 +265,7 @@ protected:
      * @brief Thread entry that will be running.
      * @param instanceAddress
      */
-    static void ThreadEntry(ULONG instanceAddress);
+    static void ThreadEntry(OS_Ulong instanceAddress);
 
     /**
      * @brief Function to Create TX thread.
@@ -271,8 +278,8 @@ protected:
      * @param timeSliceAllowed - Time slice allowed to run before being preempted.
      * @param auto_start - Automatic start selection.
      */
-    bool CreateBaseThread(uint8_t *stack, ULONG stackSizeBytes, UINT priority, UINT preempt_threshold,
-            ULONG timeSliceAllowed, UINT auto_start) noexcept;
+    bool CreateBaseThread(uint8_t *stack, OS_Ulong stackSizeBytes, OS_Uint priority,
+            OS_Uint preempt_threshold, OS_Ulong timeSliceAllowed, OS_Uint auto_start) noexcept;
 
     /**
      * @brief Mark the setup as complete.
@@ -325,9 +332,9 @@ protected:
     void ClearThreadStepInDelay() noexcept { threadStepInDelay = false; }
 
     bool initialized;
-    TX_THREAD txThread;
-    const char *txThreadName;
-    bool txThreadCreated;
+    OS_Thread osThread;
+    const char *osThreadName;
+    bool osThreadCreated;
     SignalSemaphore signalSemaphore;
     static constexpr char baseThreadStartSemaphoreBaseName[] = "BaseThreadStartSem-";
 

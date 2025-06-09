@@ -13,11 +13,10 @@
  * BaseThread.h for a detailed description of the class design and usage.
  */
 
-#include "UTILITIES/common/BaseThread.h"
-#include "UTILITIES/common/TxUtility.h"
-#include "UTILITIES/common/Utility.h"
-
-#include "HAL/component_handlers/ConsolePort.h"
+#include "BaseThread.h"
+#include "OsUtility.h"
+#include "Utility.h"
+#include "ConsolePort.h"
 
 //==============================================================//
 /// VERBOSE??
@@ -29,7 +28,7 @@ static bool verbose = false;
 /// BASE THREAD ITEMS BASE NAMES
 //==============================================================//
 
-/// Base thread start semaphore base txThreadName that will be pre-fixed on the thread Name
+/// Base thread start semaphore base osThreadName that will be pre-fixed on the thread Name
 
 //==============================================================//
 /// BASE THREAD
@@ -41,9 +40,9 @@ static bool verbose = false;
    */
 BaseThread::BaseThread( const char* threadName) :
     initialized( false ),
-	txThread{},
-    txThreadName( threadName ),   // TODO:  This should be a strncpy into a buffer
-	txThreadCreated( false),
+	osThread{},
+    osThreadName( threadName ),   // TODO:  This should be a strncpy into a buffer
+	osThreadCreated( false),
 	signalSemaphore( baseThreadStartSemaphoreBaseName, threadName),
 
     consolePort(ConsolePort::GetInstance()),
@@ -66,28 +65,28 @@ BaseThread::BaseThread( const char* threadName) :
   */
 BaseThread::~BaseThread()
 {
-	if( txThreadCreated )
+	if( osThreadCreated )
 	{
-		WRITE_CONDITIONAL(verbose,"BaseThread::~BaseThread() - Deleting %s.", txThreadName);
+		WRITE_CONDITIONAL(verbose,"BaseThread::~BaseThread() - Deleting %s.", osThreadName);
 
-		DeleteTxThread( &txThread);
+		os_thread_delete_ex( &osThread);
 	}
 }
 
 /**
- * @brief Returns the Base thread txThreadName.
+ * @brief Returns the Base thread osThreadName.
  *
- * @return Returns the base thread txThreadName.
+ * @return Returns the base thread osThreadName.
  */
 const char* BaseThread::GetThreadName() noexcept
 {
 
-	return txThreadName;
+	return osThreadName;
 }
 
 /**
  * @brief Function to Create TX thread.
- * @param txThreadName Name of thread
+ * @param osThreadName Name of thread
  * @param stack - statically allocted stack
  * @param stackSizeBytes Numer of bytes allocated
  * @param priority - thread priority
@@ -95,57 +94,61 @@ const char* BaseThread::GetThreadName() noexcept
  * @param timeSliceAllowed -
  *  @param auto_start -
  */
-bool BaseThread::CreateBaseThread( uint8_t* stack, ULONG stackSizeBytes, UINT priority,  UINT preempt_threshold,  ULONG timeSliceAllowed, UINT auto_start  ) noexcept
+bool BaseThread::CreateBaseThread( uint8_t* stack, OS_Ulong stackSizeBytes,
+                                   OS_Uint priority, OS_Uint preempt_threshold,
+                                   OS_Ulong timeSliceAllowed, OS_Uint auto_start ) noexcept
 {
 	/// Then, if the thread is not already created, create it
 	if(signalSemaphore.EnsureInitialized())
 	{
-	  /// Create the ThreadX Thread
-	   bool status = CreateTxThread(&txThread, const_cast<char*>(txThreadName), ThreadEntry, reinterpret_cast<ULONG>(this), stack,  stackSizeBytes, priority, preempt_threshold,
-			   	   	   timeSliceAllowed, auto_start );
+	  /// Create the OS Thread
+           bool status = os_thread_create_ex(&osThread, const_cast<char*>(osThreadName), ThreadEntry,
+                                        reinterpret_cast<OS_Ulong>(this), stack,
+                                        stackSizeBytes, priority, preempt_threshold,
+                                       timeSliceAllowed, auto_start );
 	   /// If successfully created
 	   if (status)
 	   {
 		   /// Mark the base thread as created.
-		   txThreadCreated = true;
+		   osThreadCreated = true;
 
-		   WRITE_CONDITIONAL(verbose,"BaseThread::CreateBaseThread() - Successfully created %s.", txThreadName);
+		   WRITE_CONDITIONAL(verbose,"BaseThread::CreateBaseThread() - Successfully created %s.", osThreadName);
 		return true;
 	   }
 	   else
 	   {
-		   consolePort.Write("BaseThread::CreateBaseThread() - Failed to create %s.", txThreadName);
-		   TxDelayMsec( 5 );
+		   consolePort.Write("BaseThread::CreateBaseThread() - Failed to create %s.", osThreadName);
+		   os_delay_msec( 5 );
 		   return false;
 	   }
-	   return txThreadCreated;
+	   return osThreadCreated;
 	}
 
 	return false;
 }
 
 /**
-  * @brief Suspend the underlying thread ThreadX task.
+  * @brief Suspend the underlying thread OS task.
   * @return True if action successful, false otherwise.
   */
 bool BaseThread::Suspend() noexcept
 {
 	if( EnsureInitialized() )
 	{
-		return SuspendTxThread( &txThread);
+		return os_thread_suspend_ex( &osThread);
 	}
 	return false;
 }
 
 /**
-  * @brief Resume the underlying thread ThreadX task.
+  * @brief Resume the underlying thread OS task.
   * @return True if action successful, false otherwise.
   */
 bool BaseThread::Resume() noexcept
 {
 	if( EnsureInitialized() )
 	{
-		return ResumeTxThread(&txThread);
+		return os_thread_resume_ex(&osThread);
 	}
 	return false;
 }
@@ -153,20 +156,20 @@ bool BaseThread::Resume() noexcept
 
 
 /**
-  * @brief Check the status of the underlying thread ThreadX task.
+  * @brief Check the status of the underlying thread OS task.
   * @return True if action successful, false otherwise.
   */
 bool BaseThread::IsSuspended() noexcept
 {
-	if( initialized )
-	{
-		UINT state = 0;
+        if( initialized )
+        {
+                OS_Uint state = 0;
 
 	    // Get the current state of the thread
-	    if( TX_SUCCESS == tx_thread_info_get(&txThread, nullptr, &state, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr) )
+            if( OS_SUCCESS == os_thread_info_get(&osThread, &state) )
 	    {
 	    	// Check if the thread is suspended
-	    	return (state == TX_SUSPENDED) || (state == TX_SEMAPHORE_SUSP);
+                return (state == eSuspended) || (state == eBlocked);
 	    }
 
 	    return false;
@@ -179,24 +182,24 @@ bool BaseThread::IsSuspended() noexcept
 
 bool BaseThread::Start() noexcept
 {
-	WRITE_CONDITIONAL(verbose, "BaseThread::Start() - invoked on thread: %s.", txThreadName);
+	WRITE_CONDITIONAL(verbose, "BaseThread::Start() - invoked on thread: %s.", osThreadName);
 
 	if(IsThreadRunning()) {
-		WRITE_CONDITIONAL(verbose, "BaseThread::Start() - thread: %s - already running.", txThreadName);
+		WRITE_CONDITIONAL(verbose, "BaseThread::Start() - thread: %s - already running.", osThreadName);
 		return true;
 	}
 
-	WRITE_CONDITIONAL(verbose, "BaseThread::Start() - thread: %s - running StartAction().", txThreadName);
+	WRITE_CONDITIONAL(verbose, "BaseThread::Start() - thread: %s - running StartAction().", osThreadName);
 
 	/// Run start action
 	if(StartAction()) {
-		WRITE_CONDITIONAL(verbose, "BaseThread::Start() - thread: %s - StartAction() successful, signaling start.", txThreadName);
+		WRITE_CONDITIONAL(verbose, "BaseThread::Start() - thread: %s - StartAction() successful, signaling start.", osThreadName);
 
 	    /// If successful, signal the thread via the designated semaphore to start the process
 	    return signalSemaphore.Signal();
 	}
 	else {
-		WRITE_CONDITIONAL(verbose, "BaseThread::Start() - thread: %s - StartAction() FAILED, CANNOT SIGNAL START.", txThreadName);
+		WRITE_CONDITIONAL(verbose, "BaseThread::Start() - thread: %s - StartAction() FAILED, CANNOT SIGNAL START.", osThreadName);
 	}
 
 	/// Otherwise, indicate that we cannot start thread.
@@ -214,16 +217,16 @@ bool BaseThread::Stop() noexcept
     MarkThreadStopRequested();
 
     /// In case we are somehow suspended in our step, let's resume.
-    ResumeTxThreadIfSuspended( &txThread );
+    os_thread_resume_if_suspended( &osThread );
 
     return true;
 }
 
-void BaseThread::ThreadEntry( ULONG threadEntry)
+void BaseThread::ThreadEntry( OS_Ulong threadEntry)
 {
     BaseThread* thread = reinterpret_cast<BaseThread*>(threadEntry);
 
-    WRITE_CONDITIONAL( verbose,  "BaseThread::ThreadEntry() for %s.",  thread->txThreadName );
+    WRITE_CONDITIONAL( verbose,  "BaseThread::ThreadEntry() for %s.",  thread->osThreadName );
 
     while ( true )
     {
@@ -241,7 +244,7 @@ void BaseThread::ThreadEntry( ULONG threadEntry)
         thread->ClearCleanupComplete();		/**< Clear the cleanup complete flag. */
 
         WRITE_CONDITIONAL( verbose,  "%s() - Start initiated on semaphore: %s.",
-                 thread->txThreadName, thread->signalSemaphore.GetName());
+                 thread->osThreadName, thread->signalSemaphore.GetName());
 
         if( !thread->IsSetupComplete() )
         {
@@ -252,15 +255,15 @@ void BaseThread::ThreadEntry( ULONG threadEntry)
         while ( !thread->IsThreadStopRequested() )
         {
         	thread->waitBeforeStep = thread->Step(); 											/// Main control loop sequence
-        	thread->minTimestampBeforeNextStep = GetElapsedTimeMsec() + thread->waitBeforeStep; /// Calculate next timestamp to Step() again
+        	thread->minTimestampBeforeNextStep = os_get_elapsed_time_msec() + thread->waitBeforeStep; /// Calculate next timestamp to Step() again
 
 			thread->MarkThreadStepInDelay();							/// Mark that we are going to a delay
-			TxDelayMsec(static_cast<uint16_t>(thread->waitBeforeStep));	/// Delay requested time
+			os_delay_msec(static_cast<uint16_t>(thread->waitBeforeStep));	/// Delay requested time
 			thread->ClearThreadStepInDelay();							/// Clear that we are in a delay
         }
 
         WRITE_CONDITIONAL( verbose,  "%s() - Stop initiated on semaphore: %s.",
-           thread->txThreadName, thread->signalSemaphore.GetName());
+           thread->osThreadName, thread->signalSemaphore.GetName());
 
 
         /// Make sure to mark
@@ -282,38 +285,38 @@ void BaseThread::ThreadEntry( ULONG threadEntry)
 void BaseThread::WaitForStart() noexcept
 {
      WRITE_CONDITIONAL( verbose,  "%s() - Waiting indefinitely for start on semaphore: %s.",
-         txThreadName, signalSemaphore.GetName());
+         osThreadName, signalSemaphore.GetName());
 
      signalSemaphore.WaitUntilSignalled();
 
      WRITE_CONDITIONAL( verbose,  "%s() - received start on semaphore: %s.",
-             txThreadName, signalSemaphore.GetName());
+             osThreadName, signalSemaphore.GetName());
 }
 
 bool BaseThread::StartThreadAndWaitToVerify(uint32_t startTimeoutMsec) {
     /// Start the thread
     if (Start()) {
-       WRITE_CONDITIONAL(verbose,"BaseThread::StartThreadAndWaitToVerify() - Thread [%s] has been requested to start.", txThreadName);
+       WRITE_CONDITIONAL(verbose,"BaseThread::StartThreadAndWaitToVerify() - Thread [%s] has been requested to start.", osThreadName);
 
         /// Function that will test if the thread has been started
         std::function<bool()> CheckIfThreadIsStarted = [this]() {
             return IsThreadRunning();
         };
 
-        const uint32_t waitStartTimeMsec = GetElapsedTimeMsec();
+        const uint32_t waitStartTimeMsec = os_get_elapsed_time_msec();
 
         /// Expecting true within the timeout specified
         bool result = TestLogicWithTimeout(CheckIfThreadIsStarted, true, startTimeoutMsec, 10);
 
-        const uint32_t elapsedStartTimeMsec = GetElapsedTimeMsec() - waitStartTimeMsec;
+        const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
 
 
         /// Print info to user and do other things if necessary.
         if (result) {
-            WRITE_CONDITIONAL(verbose, "BaseThread::StartThreadAndWaitToVerify() - Thread [%s] has started after %u msec.", txThreadName, elapsedStartTimeMsec);
+            WRITE_CONDITIONAL(verbose, "BaseThread::StartThreadAndWaitToVerify() - Thread [%s] has started after %u msec.", osThreadName, elapsedStartTimeMsec);
         }
         else {
-            WRITE_CONDITIONAL(verbose, "BaseThread::StartThreadAndWaitToVerify() - Thread [%s] has NOT started within [%u] Msec!!!!!.", txThreadName, startTimeoutMsec);
+            WRITE_CONDITIONAL(verbose, "BaseThread::StartThreadAndWaitToVerify() - Thread [%s] has NOT started within [%u] Msec!!!!!.", osThreadName, startTimeoutMsec);
         }
 
         return result; /// Return result
@@ -326,27 +329,27 @@ bool BaseThread::StopThreadAndWaitToVerify(uint32_t stopTimeoutMsec) {
     /// Stop the thread
     if (Stop())
     {
-        WRITE_CONDITIONAL(verbose, "BaseThread::StopThreadAndWaitToVerify() - Thread [%s] has been requested to stop.", txThreadName);
+        WRITE_CONDITIONAL(verbose, "BaseThread::StopThreadAndWaitToVerify() - Thread [%s] has been requested to stop.", osThreadName);
 
         /// Function that will test if the thread has been stopped
         std::function<bool()> CheckIfThreadIsStopped = [this]() {
             return IsThreadStopped();
         };
 
-        const uint32_t waitStartTimeMsec = GetElapsedTimeMsec();
+        const uint32_t waitStartTimeMsec = os_get_elapsed_time_msec();
 
         /// Expecting true within the timeout specified
         bool result = TestLogicWithTimeout(CheckIfThreadIsStopped, true, stopTimeoutMsec, 10);
 
 
-        const uint32_t elapsedStopTimeMsec = GetElapsedTimeMsec() - waitStartTimeMsec;
+        const uint32_t elapsedStopTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
 
         /// Print info to user and do other things if necessary.
         if (result) {
-        	WRITE_CONDITIONAL(verbose, "BaseThread::StopThreadAndWaitToVerify() - Thread [%s] has stopped after %u msec", txThreadName, elapsedStopTimeMsec );
+        	WRITE_CONDITIONAL(verbose, "BaseThread::StopThreadAndWaitToVerify() - Thread [%s] has stopped after %u msec", osThreadName, elapsedStopTimeMsec );
         }
         else {
-        	WRITE_CONDITIONAL(verbose, "BaseThread::StopThreadAndWaitToVerify() - Thread [%s] has NOT stopped within [%u] Msec!!!!!.", txThreadName, stopTimeoutMsec);
+        	WRITE_CONDITIONAL(verbose, "BaseThread::StopThreadAndWaitToVerify() - Thread [%s] has NOT stopped within [%u] Msec!!!!!.", osThreadName, stopTimeoutMsec);
         }
 
         return result; /// Return result
@@ -355,3 +358,18 @@ bool BaseThread::StopThreadAndWaitToVerify(uint32_t stopTimeoutMsec) {
     return false; /// Return false indicating Stop() call failure
 }
 
+
+
+uint32_t BaseThread::GetStackHighWaterMark() const noexcept
+{
+    return uxTaskGetStackHighWaterMark(osThread);
+}
+
+bool BaseThread::ChangePriority(uint32_t newPriority) noexcept
+{
+    if (osThread) {
+        vTaskPrioritySet(osThread, newPriority);
+        return true;
+    }
+    return false;
+}

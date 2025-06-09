@@ -15,15 +15,15 @@
 #include <bitset>
 #include <functional>
 
-#include "UTILITIES/common/RtosCompat.h"
+#include "OsAbstraction.h"
 
-#include <HAL/component_handlers/ConsolePort.h>
+#include "ConsolePort.h"
 
-#include <UTILITIES/common/TxUtility.h>
-#include <UTILITIES/common/Utility.h>
-#include <UTILITIES/common/BaseThread.h>
-#include <UTILITIES/common/Mutex.h>
-#include <UTILITIES/common/MutexGuard.h>
+#include "OsUtility.h"
+#include "Utility.h"
+#include "BaseThread.h"
+#include "Mutex.h"
+#include "MutexGuard.h"
 
 //==============================================================//
 // CLASS
@@ -296,12 +296,12 @@ bool BaseThreadsManager<EnumType, MaxCount>::StartAllAndWaitToVerify(uint32_t wa
 			return threadsStartedTracker.all();
 		};
 
-		const uint32_t waitStartTimeMsec = GetElapsedTimeMsec();
+		const uint32_t waitStartTimeMsec = os_get_elapsed_time_msec();
 
 		/// Expecting true within the timeout specified
 		bool result = TestLogicWithTimeout(CheckIfAllHalSubThreadsAreStarted, true, waitToVerifyTimeoutMsec, timeBetweenChecksMsec);
 
-		const uint32_t elapsedStartTimeMsec = GetElapsedTimeMsec() - waitStartTimeMsec;
+		const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
 
 		/// Print info to user.
 		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllAndWaitToVerify() - //============================================//");
@@ -361,12 +361,12 @@ bool BaseThreadsManager<EnumType, MaxCount>::StartSelectedAndWaitToVerify(const 
 			return true;
 		};
 
-		const uint32_t waitStartTimeMsec = GetElapsedTimeMsec();
+		const uint32_t waitStartTimeMsec = os_get_elapsed_time_msec();
 
 		/// Expecting true within the timeout specified
 		bool result = TestLogicWithTimeout(CheckIfAllSelectedThreadsAreStarted, true, waitToVerifyTimeoutMsec, timeBetweenChecksMsec);
 
-		const uint32_t elapsedStartTimeMsec = GetElapsedTimeMsec() - waitStartTimeMsec;
+		const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
 
 		/// Print info to user.
 		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartSelectedAndWaitToVerify() - //============================================//");
@@ -431,12 +431,12 @@ bool BaseThreadsManager<EnumType, MaxCount>::StartAllExceptSelectedAndWaitToVeri
 			return true;
 		};
 
-		const uint32_t waitStartTimeMsec = GetElapsedTimeMsec();
+		const uint32_t waitStartTimeMsec = os_get_elapsed_time_msec();
 
 		/// Expecting true within the timeout specified
 		bool result = TestLogicWithTimeout(CheckIfAllExceptSelectedThreadsAreStarted, true, waitToVerifyTimeoutMsec, timeBetweenChecksMsec);
 
-		const uint32_t elapsedStartTimeMsec = GetElapsedTimeMsec() - waitStartTimeMsec;
+		const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
 
 		/// Print info to user.
 		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllExceptSelectedAndWaitToVerify() - //============================================//");
@@ -567,13 +567,13 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopAllAndWaitToVerify(uint32_t wai
 		};
 
 		/// Get the time the waiting is starting
-		const uint32_t waitStartTimeMsec = GetElapsedTimeMsec();
+		const uint32_t waitStartTimeMsec = os_get_elapsed_time_msec();
 
 		/// Expecting true within the timeout specified
 		bool result = TestLogicWithTimeout(CheckIfAllHalSubThreadsAreStopped, true, waitToVerifyTimeoutMsec, timeBetweenChecksMsec);
 
 		/// Get total elapsed time in logic test function
-		const uint32_t elapsedStartTimeMsec = GetElapsedTimeMsec() - waitStartTimeMsec;
+		const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
 
 		/// Print info to user.
 		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllAndWaitToVerify() - //============================================//");
@@ -631,12 +631,12 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopSelectedAndWaitToVerify(const s
 			return true;
 		};
 
-		const uint32_t waitStartTimeMsec = GetElapsedTimeMsec();
+		const uint32_t waitStartTimeMsec = os_get_elapsed_time_msec();
 
 		/// Expecting true within the timeout specified
 		bool result = TestLogicWithTimeout(CheckIfAllSelectedThreadsAreStopped, true, waitToVerifyTimeoutMsec, timeBetweenChecksMsec);
 
-		const uint32_t elapsedStartTimeMsec = GetElapsedTimeMsec() - waitStartTimeMsec;
+		const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
 
 		/// Print info to user.
 		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopSelectedAndWaitToVerify() - //============================================//");
@@ -703,12 +703,12 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopAllExceptSelectedAndWaitToVerif
 			return true;
 		};
 
-		const uint32_t waitStopTimeMsec = GetElapsedTimeMsec();
+		const uint32_t waitStopTimeMsec = os_get_elapsed_time_msec();
 
 		/// Expecting true within the timeout specified
 		bool result = TestLogicWithTimeout(CheckIfAllExceptSelectedThreadsAreStopped, true, waitToVerifyTimeoutMsec, timeBetweenChecksMsec);
 
-		const uint32_t elapsedStopTimeMsec = GetElapsedTimeMsec() - waitStopTimeMsec;
+		const uint32_t elapsedStopTimeMsec = os_get_elapsed_time_msec() - waitStopTimeMsec;
 
 		/// Print info to user.
 		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllExceptSelectedAndWaitToVerify() - //============================================//");
@@ -770,7 +770,7 @@ bool BaseThreadsManager<EnumType, MaxCount>::Initialize() noexcept
 			else {
 			//	ConsolePort::WriteConditional(verbose, "BaseThreadsManager::Initialize() - Failed to initialize: %s", enumToString(threadMap.first));
 				ConsolePort::Write("BaseThreadsManager::Initialize() - Failed to initialize: %s", enumToString(threadMap.first));
-				TxDelayMsec( 5 );
+				os_delay_msec( 5 );
 			}
 		}
 

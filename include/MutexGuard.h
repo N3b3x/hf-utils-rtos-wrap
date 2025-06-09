@@ -38,14 +38,14 @@ public:
 	  * @param mutex Mutex to be acquired
 	  * @param[out] success A pointer to store success of mutex acquiring.
 	  */
-    MutexGuard(TX_MUTEX* mutex, bool* pSuccess);
+    MutexGuard(OS_Mutex* mutex, bool* pSuccess);
 
 	/**
 	  * @brief The constructor acquires the mutex, expected to wait forever.
 	  * @param mutex Mutex to be acquired
 	  * @param[out] success A pointer to store success of mutex acquiring.
 	  */
-    MutexGuard(TX_MUTEX& mutex, bool* pSuccess);
+    MutexGuard(OS_Mutex& mutex, bool* pSuccess);
 
     /**
   	  * @brief The constructor acquires the mutex
@@ -60,7 +60,7 @@ public:
 	  * @param maxMsecToWait Max time to wait before timing out
 	  * @param[out] success A pointer to store success of mutex acquiring.
 	  */
-    MutexGuard(TX_MUTEX* mutex, uint32_t maxMsecToWait = MaxWaitTimeMsec, bool* pSuccess = nullptr);
+    MutexGuard(OS_Mutex* mutex, uint32_t maxMsecToWait = MaxWaitTimeMsec, bool* pSuccess = nullptr);
 
 	/**
 	  * @brief The constructor acquires the mutex
@@ -68,7 +68,7 @@ public:
 	  * @param maxMsecToWait Max time to wait before timing out
 	  * @param[out] success A pointer to store success of mutex acquiring.
 	  */
-    MutexGuard(TX_MUTEX& mutex, uint32_t maxMsecToWait = MaxWaitTimeMsec, bool* pSuccess = nullptr);
+    MutexGuard(OS_Mutex& mutex, uint32_t maxMsecToWait = MaxWaitTimeMsec, bool* pSuccess = nullptr);
 
     /**
   	  * @brief The constructor acquires the mutex
@@ -89,7 +89,7 @@ public:
 
 
 private:
-    mutable std::variant<TX_MUTEX*, Mutex*> mutex;        //  Address of existing threadX mutex or Mutex instance
+    mutable std::variant<OS_Mutex*, Mutex*> mutex;        //  Address of existing OS mutex or Mutex instance
 
 };
 

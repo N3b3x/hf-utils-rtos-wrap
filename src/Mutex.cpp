@@ -13,9 +13,8 @@
  */
 
 
-#include <UTILITIES/common/Mutex.h>
-#include <UTILITIES/common/ThingsToString.h>
-#include <HAL/component_handlers/ConsolePort.h>
+#include "Mutex.h"
+#include "ConsolePort.h"
 #include <cstring>
 #include <cstdio>
 /**
@@ -51,7 +50,7 @@ Mutex::~Mutex()
 {
 	if( initialized )
 	{
-		DeleteTxMutex(mutex);
+		os_mutex_delete_ex(mutex);
 	}
 }
 
@@ -63,8 +62,8 @@ bool Mutex::Lock( uint32_t maxMsecToWait) noexcept
 {
 	if( EnsureInitialized() )
 	{
-		UINT result = tx_mutex_get( &mutex,  ConvertMsecToDelayTicks(maxMsecToWait));  // tx_mutex_get checks for bad params
-		if( result == TX_SUCCESS )
+                OS_Uint result = os_mutex_get( &mutex,  os_convert_msec_to_delay_ticks(maxMsecToWait));  // os_mutex_get checks for bad params
+		if( result == OS_SUCCESS )
 		{
 			return true;
 		}
@@ -88,8 +87,8 @@ bool Mutex::Unlock() noexcept
 {
 	if( EnsureInitialized() )
 	{
-		UINT result = tx_mutex_put(&mutex);
-		if( result == TX_SUCCESS )
+                OS_Uint result = os_mutex_put(&mutex);
+		if( result == OS_SUCCESS )
 		{
 			return true;
 		}

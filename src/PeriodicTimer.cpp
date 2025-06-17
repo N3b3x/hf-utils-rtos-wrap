@@ -1,8 +1,5 @@
 #include "PeriodicTimer.h"
 
-PeriodicTimer::~PeriodicTimer() {
-    if (created) {
-        os_timer_deactivate_and_delete_ex(timer);
-    }
-}
+// The constructor, destructor, and other methods are already defined inline in the header file.
+// This file is only needed if we want to implement any out-of-line methods.
 

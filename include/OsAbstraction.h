@@ -142,6 +142,8 @@ static inline OS_Uint os_event_group_create(OS_EventGroup *g, const char* /*name
 static inline OS_Uint os_event_group_delete(OS_EventGroup *g) { vEventGroupDelete(*g); return OS_SUCCESS; }
 static inline OS_Uint os_event_group_set(OS_EventGroup *g, OS_Ulong flags)
 { xEventGroupSetBits(*g, flags); return OS_SUCCESS; }
+static inline OS_Uint os_event_group_clear(OS_EventGroup *g, OS_Ulong flags)
+{ xEventGroupClearBits(*g, flags); return OS_SUCCESS; }
 static inline OS_Uint os_event_group_get(OS_EventGroup *g, OS_Ulong flags, OS_Uint option,
                                          OS_Ulong *actual, OS_Ulong wait)
 {
@@ -191,20 +193,20 @@ static inline OS_Uint os_timer_delete(OS_Timer *t)
     xTimerDelete(*t, 0);
     return OS_SUCCESS;
 }
-static inline OS_Uint os_timer_activate(OS_Timer *t)   { return xTimerStart(*t,0)==pdPASS ? OS_SUCCESS:1; }
-static inline OS_Uint os_timer_deactivate(OS_Timer *t) { return xTimerStop(*t,0)==pdPASS ? OS_SUCCESS:1; }
+static inline OS_Uint os_timer_activate(OS_Timer *t)   { return xTimerStart(*t,0)==pdPASS ? OS_SUCCESS:(OS_Uint)1; }
+static inline OS_Uint os_timer_deactivate(OS_Timer *t) { return xTimerStop(*t,0)==pdPASS ? OS_SUCCESS:(OS_Uint)1; }
 
 /* Stream buffer wrappers ------------------------------------------------*/
 static inline OS_Uint os_stream_buffer_create(OS_StreamBuffer *b, size_t capacity, size_t trigger)
 {
     *b = xStreamBufferCreate(capacity, trigger);
-    return (*b) ? OS_SUCCESS : 1;
+    return (*b) ? OS_SUCCESS : (OS_Uint)1;
 }
 static inline OS_Uint os_stream_buffer_delete(OS_StreamBuffer *b) { vStreamBufferDelete(*b); return OS_SUCCESS; }
 static inline OS_Uint os_stream_buffer_send(OS_StreamBuffer *b, const void *data, size_t len, OS_Ulong wait)
 { return xStreamBufferSend(*b, data, len, wait) == len ? (OS_Uint)OS_SUCCESS : (OS_Uint)1; }
 static inline OS_Uint os_stream_buffer_receive(OS_StreamBuffer *b, void *data, size_t len, OS_Ulong wait)
-{ return xStreamBufferReceive(*b, data, len, wait) > 0 ? OS_SUCCESS : 1; }
+{ return xStreamBufferReceive(*b, data, len, wait) > 0 ? OS_SUCCESS : (OS_Uint)1; }
 
 /* Critical section wrappers ----------------------------------------------*/
 typedef portMUX_TYPE OS_Critical;

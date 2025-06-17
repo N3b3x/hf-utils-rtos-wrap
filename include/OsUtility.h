@@ -14,11 +14,35 @@
 #define OS_UTILITY_H_
 
 #include "OsAbstraction.h"
-#include "Utility.h"
 
 #define UTIL_SYSTEM_CLOCK (240000000.0)	//240MHz
 
 static constexpr uint32_t osTickRateHz = configTICK_RATE_HZ; // 1000 ticks per second
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * @brief Delays execution for the specified number of milliseconds.
+ *
+ * @param msec The delay duration in milliseconds.
+ */
+void os_delay_msec(uint16_t msec);
+
+/**
+ * @brief Retrieves the elapsed time in milliseconds.
+ *
+ * @return The elapsed time in milliseconds.
+ */
+uint32_t os_get_elapsed_time_msec();
+
+#ifdef __cplusplus
+}
+#endif
+
+// Include after function declarations to avoid circular dependency
+#include "Utility.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -71,7 +71,9 @@ public:
 
 	uint32_t GetOwnershipCount() const noexcept
 	{
-		return mutex.tx_mutex_ownership_count;
+		// FreeRTOS mutexes don't have ownership count like ThreadX
+		// Return 0 to indicate not supported or implement alternative logic
+		return 0;
 	}
 
 	const char* GetName() const noexcept

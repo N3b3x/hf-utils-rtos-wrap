@@ -8,6 +8,7 @@
  */
 
 #include "SignalSemaphore.h"
+#include <cstring>
 
 /**
  * @example

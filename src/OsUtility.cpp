@@ -5,7 +5,7 @@
  * This file is part of HardFOC and is licensed under the GNU General Public License v3.0 or later.
   *
   *  Contains the declaration and definition of the utility functions related to
-  *     the threadX RTOS..
+  *     the FreeRTOS RTOS.
   *
   *   Note:  These functions are not thread or interrupt-safe and should be called
   *          called with appropriate guards if used within an ISR or shared between tasks.
@@ -13,7 +13,15 @@
 #include <cmath>
 #include "OsAbstraction.h"
 #include "ConsolePort.h"
+#include "FreeRTOSUtils.h"
 #include "OsUtility.h"
+
+//==============================================================//
+// GLOBALS
+//==============================================================//
+
+// Critical section mutex required by OsAbstraction.h
+OS_Critical os_critical_mux = portMUX_INITIALIZER_UNLOCKED;
 
 //==============================================================//
 // FUNCTIONS
@@ -26,7 +34,7 @@ void os_delay_msec( uint16_t msec )
 	uint32_t result = os_thread_sleep (ticks);
 	if( result != OS_SUCCESS )
 	{
-		ConsolePort::GetInstance().Write ( "os_delay_msec() - Failed to sleep for %u msec, reason: %s.", msec, ThreadxRetToString(result) );
+		console_error("OsUtility", "os_delay_msec() - Failed to sleep for %u msec, reason: %s.", msec, freertos_ret_to_string(result));
 	}
 }
 
@@ -64,8 +72,6 @@ uint32_t os_get_elapsed_time_msec() {
 
 uint32_t os_get_elapsed_processor_cycle_count(uint32_t startCycleCount, time_unit_t unit )
 {
-    uint32_t elapsed_cycles;
-
     static const float time_unit_us_divider = (1000000.0);
     static const float time_unit_ms_divider = (1000.0);
 	static const float time_unit_s_divider = (1.0);
@@ -94,20 +100,29 @@ uint32_t os_get_elapsed_processor_cycle_count(uint32_t startCycleCount, time_uni
 		}
     }
 
-    if(startCycleCount > DWT->CYCCNT)
+    // ESP32 doesn't have DWT registers, use FreeRTOS tick count instead
+    // Note: This provides lower resolution than ARM DWT but is portable
+    uint32_t current_ticks = xTaskGetTickCount();
+    uint32_t elapsed_ticks;
+    
+    if(startCycleCount > current_ticks)
     {
-        elapsed_cycles = ~(startCycleCount - DWT->CYCCNT);
+        elapsed_ticks = ~(startCycleCount - current_ticks);
     }
     else
     {
-        elapsed_cycles = DWT->CYCCNT - startCycleCount;
+        elapsed_ticks = current_ticks - startCycleCount;
     }
 
-    return (uint32_t)(elapsed_cycles / (UTIL_SYSTEM_CLOCK / divider));
+    // Convert ticks to the requested time unit
+    // Note: This is an approximation since we're using ticks instead of actual cycles
+    return (uint32_t)(elapsed_ticks * (1000.0 / configTICK_RATE_HZ) / (1000.0 / divider));
 }
 
 uint32_t os_get_processor_cycle_count(){
-	return DWT->CYCCNT;
+    // Return FreeRTOS tick count instead of actual processor cycles
+    // This provides consistent timing across different platforms
+    return xTaskGetTickCount();
 }
 
 //constexpr uint32_t os_convert_msec_to_delay_ticks( uint32_t milliseconds )
@@ -147,19 +162,19 @@ bool os_mutex_create_ex(OS_Mutex& mutex, const char* mutexName, OS_Uint inherit,
                 OS_Uint status = os_mutex_create(&mutex, const_cast<char*>(mutexName), inherit);
 		if (status == OS_SUCCESS)
 		{
-			WRITE_CONDITIONAL( !suppressVerbose, "CreateMutex() - Successful for %s, reason: %s(%d).",
-					mutexName, ThreadxRetToString(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "CreateMutex() - Successful for %s, reason: %s(%d).",
+					mutexName, freertos_ret_to_string(status), status);
 			return true;
 		}
 		else
 		{
-			WRITE_CONDITIONAL( !suppressVerbose, "CreateMutex() - Failed for %s, reason: %s(%d).",
-					mutexName, ThreadxRetToString(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "CreateMutex() - Failed for %s, reason: %s(%d).",
+					mutexName, freertos_ret_to_string(status), status);
 		}
 	}
 	else
 	{
-		WRITE_CONDITIONAL( !suppressVerbose, "CreateMutex() - Null pointer passed for mutex name.");
+		ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "CreateMutex() - Null pointer passed for mutex name.");
 	}
 
 	// TODO: Error Handling
@@ -173,19 +188,19 @@ bool os_mutex_create_p(OS_Mutex* mutex, const char* mutexName, OS_Uint inherit, 
                 OS_Uint status = os_mutex_create(mutex, const_cast<char*>(mutexName), inherit);
 		if (status == OS_SUCCESS)
 		{
-			WRITE_CONDITIONAL( !suppressVerbose, "CreateMutex() - Successful for %s, reason: %s(%d).",
-					mutexName, ThreadxRetToString(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "CreateMutex() - Successful for %s, reason: %s(%d).",
+					mutexName, freertos_ret_to_string(status), status);
 			return true;
 		}
 		else
 		{
-			WRITE_CONDITIONAL( !suppressVerbose, "CreateMutex() - Failed for %s, reason: %s(%d).",
-					mutexName, ThreadxRetToString(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "CreateMutex() - Failed for %s, reason: %s(%d).",
+					mutexName, freertos_ret_to_string(status), status);
 		}
 	}
 	else
 	{
-		WRITE_CONDITIONAL( !suppressVerbose, "CreateMutex() - Null pointer passed for mutex name.");
+		ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "CreateMutex() - Null pointer passed for mutex name.");
 	}
 
 	// TODO: Error Handling
@@ -205,12 +220,12 @@ bool os_mutex_get_ex(OS_Mutex& mutex, OS_Ulong wait_option, bool suppressVerbose
 
     if (err == OS_SUCCESS)
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_mutex_get_ex() - Successfully acquired mutex - %s.", mutex."mutex");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_get_ex() - Successfully acquired mutex - %s.", mutex);
         return true;
     }
     else
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_mutex_get_ex() - Failed to acquire mutex - %s - Error: %s(%d).", mutex."mutex", ThreadxRetToString(err), err);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_get_ex() - Failed to acquire mutex - %s - Error: %s(%d).", mutex, freertos_ret_to_string(err), err);
         // TBD: Log appropriate error here
         return false;
     }
@@ -229,12 +244,12 @@ bool os_mutex_get_p(OS_Mutex* mutex, OS_Ulong wait_option, bool suppressVerbose)
 
     if (err == OS_SUCCESS)
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_mutex_get_ex() - Successfully acquired mutex - %s.", mutex->"mutex");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_get_ex() - Successfully acquired mutex - %s.", mutex);
         return true;
     }
     else
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_mutex_get_ex() - Failed to acquire mutex - %s - Error: %s(%d).", mutex->"mutex", ThreadxRetToString(err), err);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_get_ex() - Failed to acquire mutex - %s - Error: %s(%d).", mutex, freertos_ret_to_string(err), err);
         // TBD: Log appropriate error here
         return false;
     }
@@ -252,12 +267,12 @@ bool os_mutex_put_ex(OS_Mutex& mutex, bool suppressVerbose) noexcept
 
     if (err == OS_SUCCESS)
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_mutex_put_ex() - Successfully released mutex - %s.", mutex."mutex");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_put_ex() - Successfully released mutex - %s.", mutex);
         return true;
     }
     else
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_mutex_put_ex() - Failed to release mutex - %s - Error: %s(%d).", mutex."mutex", ThreadxRetToString(err), err);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_put_ex() - Failed to release mutex - %s - Error: %s(%d).", mutex, freertos_ret_to_string(err), err);
         // TBD: Log appropriate error here
         return false;
     }
@@ -275,12 +290,12 @@ bool os_mutex_put_p(OS_Mutex* mutex, bool suppressVerbose) noexcept
 
     if (err == OS_SUCCESS)
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_mutex_put_ex() - Successfully released mutex - %s.", mutex->"mutex");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_put_ex() - Successfully released mutex - %s.", mutex);
         return true;
     }
     else
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_mutex_put_ex() - Failed to release mutex - %s - Error: %s(%d).", mutex->"mutex", ThreadxRetToString(err), err);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_put_ex() - Failed to release mutex - %s - Error: %s(%d).", mutex, freertos_ret_to_string(err), err);
         // TBD: Log appropriate error here
         return false;
     }
@@ -296,13 +311,13 @@ bool os_mutex_delete_ex(OS_Mutex& mutex, bool suppressVerbose) noexcept
         OS_Uint status = os_mutex_delete( &mutex );
 	if( status != OS_SUCCESS)
 	{
-		if( mutex."mutex" )
+		if( mutex )
 		{
-			WRITE_CONDITIONAL( !suppressVerbose, "os_mutex_delete_ex() - Failed to delete mutex: %s, reason: %s(%d).",  mutex."mutex", ThreadxRetToString(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_delete_ex() - Failed to delete mutex: %s, reason: %s(%d).",  mutex, freertos_ret_to_string(status), status);
 		}
 		else
 		{
-			WRITE_CONDITIONAL( !suppressVerbose, "os_mutex_delete_ex() - Failed to delete mutex, reason: %s(%d)", ThreadxRetToString(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_delete_ex() - Failed to delete mutex, reason: %s(%d)", freertos_ret_to_string(status), status);
 		}
 		return false;
 	}
@@ -320,13 +335,13 @@ bool os_mutex_delete_p(OS_Mutex* mutex, bool suppressVerbose) noexcept
         OS_Uint status = os_mutex_delete( mutex );
 	if( status != OS_SUCCESS)
 	{
-		if( mutex->"mutex" )
+		if( mutex )
 		{
-			WRITE_CONDITIONAL( !suppressVerbose, "os_mutex_delete_ex() - Failed to delete mutex: %s, reason: %s(%d).",  mutex->"mutex", ThreadxRetToString(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_delete_ex() - Failed to delete mutex: %s, reason: %s(%d).",  mutex, freertos_ret_to_string(status), status);
 		}
 		else
 		{
-			WRITE_CONDITIONAL( !suppressVerbose, "os_mutex_delete_ex() - Failed to delete mutex, reason: %s(%d)", ThreadxRetToString(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_delete_ex() - Failed to delete mutex, reason: %s(%d)", freertos_ret_to_string(status), status);
 		}
 		return false;
 	}
@@ -372,13 +387,13 @@ bool os_thread_create_ex(OS_Thread* txThread, const char* name,
         /// Add to the overall system thread count
         ++g_ssp_common_thread_count;
 
-        WRITE_CONDITIONAL(!suppressVerbose, "os_thread_create_ex() - Successfully created %s.", name);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_thread_create_ex() - Successfully created %s.", name);
         return true;
     }
     else
     {
-    //    WRITE_CONDITIONAL(!suppressVerbose, "os_thread_create_ex() - Failed to create %s. - Failure: %s(%d).", name, ThreadxRetToString(err), err);
-    	 ConsolePort::Write( "os_thread_create_ex() - Failed to create %s. - Failure: %s(%d).", name, ThreadxRetToString(err), err);
+    //    ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_thread_create_ex() - Failed to create %s. - Failure: %s(%d).", name, freertos_ret_to_string(err), err);
+    	 ConsolePort::Write("OsUtility",  "os_thread_create_ex() - Failed to create %s. - Failure: %s(%d).", name, freertos_ret_to_string(err), err);
     	 os_delay_msec( 5 );
         /// TODO: log appropriate error here
         return false;
@@ -400,13 +415,13 @@ bool os_thread_delete_ex(OS_Thread *txThread, bool suppressVerbose) noexcept
 
 		if (err == OS_SUCCESS)
 		{
-			WRITE_CONDITIONAL(!suppressVerbose, "os_thread_delete_ex() - Successfully deleted %s.", "thread");
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_thread_delete_ex() - Successfully deleted %s.", "thread");
 			--g_ssp_common_thread_count; /// Decrement the overall system thread count
 			return true;
 		}
 	}
-	WRITE_CONDITIONAL(!suppressVerbose, "os_thread_delete_ex() - Failed to delete %s. - Failure: %s(%d).",
-        								"thread", ThreadxRetToString(err), err);
+	ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_thread_delete_ex() - Failed to delete %s. - Failure: %s(%d).",
+        								"thread", freertos_ret_to_string(err), err);
         /// TODO: log appropriate error here
     return false;
 }
@@ -416,19 +431,19 @@ bool os_thread_resume_ex( OS_Thread* thread, bool suppressVerbose )
 	bool success = false;
 	if( thread != nullptr )
 	{
-		if( thread->os_thread_id != 0 )
+		if( *thread != NULL )
 		{
 
-			WRITE_CONDITIONAL( !suppressVerbose, "os_thread_resume_ex() - Resuming %s.",  "thread");
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_thread_resume_ex() - Resuming %s.",  "thread");
 			uint32_t result = os_thread_resume(thread);
 
 			os_delay_msec( 10 ); // Give the thread a chance to start
 
 
-			if ((result != OS_SUCCESS) && (result != OS_RESUME_ERROR ) && (result != OS_SUSPEND_LIFTED  ))
+			if (result != OS_SUCCESS)
 			{
-				WRITE_CONDITIONAL( !suppressVerbose,  "os_thread_resume_ex() - Failed to resume %s, reason: %s.",
-				   "thread",  ThreadxRetToString( result));
+				ConsolePort::WriteConditional(!suppressVerbose, "OsUtility",  "os_thread_resume_ex() - Failed to resume %s, reason: %s.",
+				   "thread",  freertos_ret_to_string( result));
 			}
 			else
 			{
@@ -437,12 +452,12 @@ bool os_thread_resume_ex( OS_Thread* thread, bool suppressVerbose )
 		}
 		else
 		{
-			WRITE_CONDITIONAL( !suppressVerbose,  "os_thread_resume_ex() - Attempted to resume a thread that wasn't created.");
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility",  "os_thread_resume_ex() - Attempted to resume a thread that wasn't created.");
 		}
 	}
 	else
 	{
-		WRITE_CONDITIONAL( !suppressVerbose,  "os_thread_resume_ex() - Null pointer passed.");
+		ConsolePort::WriteConditional(!suppressVerbose, "OsUtility",  "os_thread_resume_ex() - Null pointer passed.");
 	}
 	return success;
 }
@@ -462,14 +477,14 @@ bool os_thread_resume_if_suspended(OS_Thread *thread, bool suppressVerbose) noex
 			if (err == OS_SUCCESS)
 			{
 				os_delay_msec( 1 );   // Give chance for thread to execute
-				WRITE_CONDITIONAL(!suppressVerbose, "os_thread_resume_if_suspended() - Successfully resumed thread - %s.",
+				ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_thread_resume_if_suspended() - Successfully resumed thread - %s.",
 												"thread");
 				return true;
 			}
 			else
 			{
-				WRITE_CONDITIONAL(!suppressVerbose, "os_thread_resume_if_suspended() - Failed to resume thread - %s - Failure: %s(%d).",
-												"thread", ThreadxRetToString(err), err);
+				ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_thread_resume_if_suspended() - Failed to resume thread - %s - Failure: %s(%d).",
+												"thread", freertos_ret_to_string(err), err);
 				// TBD: log appropriate error here
 				return false;
 			}
@@ -477,13 +492,13 @@ bool os_thread_resume_if_suspended(OS_Thread *thread, bool suppressVerbose) noex
 		else
 		{
 			// If the thread is not suspended, there's nothing to do
-			WRITE_CONDITIONAL(!suppressVerbose, "Thread is not suspended, no action taken.");
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "Thread is not suspended, no action taken.");
 			return true;
 		}
     }
 	else  // Unable to get state of thread
 	{
-		WRITE_CONDITIONAL(!suppressVerbose, "Unable to determien state of thread, reason:Thread is not suspended, no action taken.");
+		ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "Unable to determien state of thread, reason:Thread is not suspended, no action taken.");
 		return false;
 	}
 }
@@ -493,10 +508,10 @@ bool os_thread_suspend_ex( OS_Thread* thread, bool suppressVerbose )
 {
     if( thread != nullptr )
     {
-        if( thread->os_thread_id != 0 )
+        if( *thread != NULL )
         {
 
-            WRITE_CONDITIONAL( !suppressVerbose, "os_thread_suspend_ex() - Suspending %s.",  "thread");
+            ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_thread_suspend_ex() - Suspending %s.",  "thread");
             uint32_t result = os_thread_suspend(thread);
 
             os_delay_msec( 10 ); // Give the thread a chance to start
@@ -507,18 +522,18 @@ bool os_thread_suspend_ex( OS_Thread* thread, bool suppressVerbose )
             }
             else
             {
-                WRITE_CONDITIONAL( !suppressVerbose,  "os_thread_suspend_ex() - Failed to suspend %s, reason: %s.",
-                                   "thread",  ThreadxRetToString( result));
+                ConsolePort::WriteConditional(!suppressVerbose, "OsUtility",  "os_thread_suspend_ex() - Failed to suspend %s, reason: %s.",
+                                   "thread",  freertos_ret_to_string( result));
             }
         }
         else
         {
-            WRITE_CONDITIONAL( !suppressVerbose,  "os_thread_suspend_ex() - Attempted to suspend a thread that wasn't created.");
+            ConsolePort::WriteConditional(!suppressVerbose, "OsUtility",  "os_thread_suspend_ex() - Attempted to suspend a thread that wasn't created.");
         }
     }
     else
     {
-        WRITE_CONDITIONAL( !suppressVerbose,  "os_thread_suspend_ex() - Null pointer passed.");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility",  "os_thread_suspend_ex() - Null pointer passed.");
     }
     return false;
 }
@@ -542,18 +557,18 @@ bool os_queue_create_ex(OS_Queue& queue, const char* queueName, OS_Uint messageS
         OS_Uint status = os_queue_create(&queue, const_cast<char*>(queueName), messageSizeInWords, queueStorage, queueSize);
         if (status == OS_SUCCESS)
         {
-            WRITE_CONDITIONAL( !suppressVerbose, "os_queue_create_ex() - Queue %s successfully created.", queueName);
+            ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_queue_create_ex() - Queue %s successfully created.", queueName);
             return true;
         }
         else
         {
-            WRITE_CONDITIONAL( !suppressVerbose, "os_queue_create_ex() - Failed for %s, reason: %s(%d).",
-                    queueName, ThreadxRetToString(status), status);
+            ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_queue_create_ex() - Failed for %s, reason: %s(%d).",
+                    queueName, freertos_ret_to_string(status), status);
         }
     }
     else
     {
-        WRITE_CONDITIONAL( !suppressVerbose, "os_queue_create_ex() - Null pointer passed for queue name.");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_queue_create_ex() - Null pointer passed for queue name.");
     }
 
     // TODO: Error Handling
@@ -572,11 +587,11 @@ bool os_queue_delete_ex(OS_Queue& queue, bool suppressVerbose) noexcept
     {
         if("queue")
         {
-            WRITE_CONDITIONAL( !suppressVerbose, "os_queue_delete_ex() - Failed to delete queue: %s, reason: %s(%d).",  "queue", ThreadxRetToString(status), status);
+            ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_queue_delete_ex() - Failed to delete queue: %s, reason: %s(%d).",  "queue", freertos_ret_to_string(status), status);
         }
         else
         {
-            WRITE_CONDITIONAL( !suppressVerbose, "os_queue_delete_ex() - Failed to delete queue, reason: %s(%d)", ThreadxRetToString(status), status);
+            ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_queue_delete_ex() - Failed to delete queue, reason: %s(%d)", freertos_ret_to_string(status), status);
         }
         return false;
     }
@@ -594,10 +609,10 @@ bool os_queue_delete_ex(OS_Queue& queue, bool suppressVerbose) noexcept
 bool os_queue_send_ex(OS_Queue& queue, void* message, OS_Ulong wait_option, bool suppressVerbose) noexcept {
     OS_Uint status = os_queue_send(&queue, message, wait_option);
     if (status == OS_SUCCESS) {
-        WRITE_CONDITIONAL( !suppressVerbose, "os_queue_send_ex() - Successfully sent message to queue: %s.", "queue");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_queue_send_ex() - Successfully sent message to queue: %s.", "queue");
         return true;
     } else {
-        WRITE_CONDITIONAL( !suppressVerbose, "os_queue_send_ex() - Failed to send message to queue: %s, error code: %u .", "queue", status);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_queue_send_ex() - Failed to send message to queue: %s, error code: %u .", "queue", status);
         return false;
     }
 }
@@ -612,10 +627,10 @@ bool os_queue_send_ex(OS_Queue& queue, void* message, OS_Ulong wait_option, bool
 bool os_queue_receive_ex(OS_Queue& queue, void* message, OS_Ulong wait_option, bool suppressVerbose) noexcept {
     OS_Uint status = os_queue_receive(&queue, message, wait_option);
     if (status == OS_SUCCESS) {
-        WRITE_CONDITIONAL( !suppressVerbose, "os_queue_receive_ex() - Successfully received message from queue: %s.", "queue");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_queue_receive_ex() - Successfully received message from queue: %s.", "queue");
         return true;
     } else {
-        WRITE_CONDITIONAL( !suppressVerbose, "os_queue_receive_ex() - Failed to receive message from queue: %s, error code: %u .", "queue", status);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_queue_receive_ex() - Failed to receive message from queue: %s, error code: %u .", "queue", status);
         return false;
     }
 }
@@ -646,20 +661,20 @@ bool os_timer_create_ex ( OS_Timer& timer, const char* name, void (*callback)(ui
 				rescheduleTimeoutTicks, autoActivate);
 		if (status == OS_SUCCESS)
 		{
-			WRITE_CONDITIONAL( !suppressVerbose,  "os_timer_create_ex() - Successfully created timer: %s (%s), address: %p, Expiration Input: %u.",
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility",  "os_timer_create_ex() - Successfully created timer: %s (%s), address: %p, Expiration Input: %u.",
 				name, "timer", &timer, callbackExpirationInput);
 			return true;
 		}
 		else
 		{
-			ConsolePort::Write(  "os_timer_create_ex() - Failed to create timer: %s, address: %p, reason: %s(%d)", name,
-					&timer,ThreadxRetToString(status), status);
+			ConsolePort::Write("OsUtility",   "os_timer_create_ex() - Failed to create timer: %s, address: %p, reason: %s(%d)", name,
+					&timer,freertos_ret_to_string(status), status);
 			os_delay_msec( 5 );
 		}
 	}
 	else
 	{
-		ConsolePort::Write( "os_timer_create_ex() - Null pointer passed for timer name.");
+		ConsolePort::Write("OsUtility",  "os_timer_create_ex() - Null pointer passed for timer name.");
 	}
 
 	return false;
@@ -672,7 +687,7 @@ bool os_timer_create_ex ( OS_Timer& timer, const char* name, void (*callback)(ui
   *
   * @param timer The timer to delete.
   **/
-bool os_timer_deactivate_and_delete_ex( OS_TIMER& timer, bool suppressVerbose) noexcept
+bool os_timer_deactivate_and_delete_ex( OS_Timer& timer, bool suppressVerbose) noexcept
 {
 	// Stop the timer first
 	auto status = os_timer_deactivate(&timer);
@@ -683,79 +698,79 @@ bool os_timer_deactivate_and_delete_ex( OS_TIMER& timer, bool suppressVerbose) n
 		{
 			if( "timer" )
 			{
-				WRITE_CONDITIONAL( !suppressVerbose, "DeleteOsTimer() - Failed to delete timer: %s, reason: %s(%d).", "timer", ThreadxRetToString(status), status);
+				ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "DeleteOsTimer() - Failed to delete timer: %s, reason: %s(%d).", "timer", freertos_ret_to_string(status), status);
 			}
 			else
 			{
-				WRITE_CONDITIONAL( !suppressVerbose, "DeleteOsTimer() - Failed to delete timer, reason: %s(%d)", ThreadxRetToString(status), status);
+				ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "DeleteOsTimer() - Failed to delete timer, reason: %s(%d)", freertos_ret_to_string(status), status);
 			}
 		}
 	}
 	else  // Failed to stop timer, usually due to back timer
 	{
 		// Time might have already been fired. No need to do any logging here
-		WRITE_CONDITIONAL( !suppressVerbose, "DeleteOsTimer() - Failed to stop the timer prior to deleting, reason : %s(%d).",  ThreadxRetToString(status), status);
+		ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "DeleteOsTimer() - Failed to stop the timer prior to deleting, reason : %s(%d).",  freertos_ret_to_string(status), status);
 	}
 	return status == OS_SUCCESS;
 }
 
-bool os_timer_activate_ex( OS_TIMER& timer, bool suppressVerbose) noexcept
+bool os_timer_activate_ex( OS_Timer& timer, bool suppressVerbose) noexcept
 {
    auto status = os_timer_activate(&timer);
    if (status != OS_SUCCESS)
    {
 		if( "timer" )
 		{
-			WRITE_CONDITIONAL( !suppressVerbose, "os_timer_activate_ex() - Failed to activate timer: %s, reason: %s(%d).",
-					"timer", ThreadxRetToString(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_timer_activate_ex() - Failed to activate timer: %s, reason: %s(%d).",
+					"timer", freertos_ret_to_string(status), status);
 		}
 		else
 		{
-			WRITE_CONDITIONAL( !suppressVerbose, "os_timer_activate_ex() - Failed to activate un-named timer, reason: %s(%d).",
-					ThreadxRetToString(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_timer_activate_ex() - Failed to activate un-named timer, reason: %s(%d).",
+					freertos_ret_to_string(status), status);
 		}
    }
    else if( !suppressVerbose )
    {
 	   if( "timer" )
 	   {
-		   WRITE_CONDITIONAL( !suppressVerbose, "os_timer_activate_ex() - Activated timer: %s.",
+		   ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_timer_activate_ex() - Activated timer: %s.",
 				"timer");
 	   }
 	   else
 	   {
-		   WRITE_CONDITIONAL( !suppressVerbose, "os_timer_activate_ex() - Activated un-named timer.");
+		   ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_timer_activate_ex() - Activated un-named timer.");
 	   }
    }
    return (status == OS_SUCCESS);
 }
 
-bool os_timer_deactivate_ex( OS_TIMER& timer, bool suppressVerbose) noexcept
+bool os_timer_deactivate_ex( OS_Timer& timer, bool suppressVerbose) noexcept
 {
 	auto status = os_timer_deactivate(&timer);
 	if (status != OS_SUCCESS)
 	{
 		if( "timer" )
 		{
-			WRITE_CONDITIONAL( !suppressVerbose, "os_timer_deactivate_ex() - Failed to deactivate timer: %s, reason: %s(%d).", "timer",
-					ThreadxRetToString(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_timer_deactivate_ex() - Failed to deactivate timer: %s, reason: %s(%d).", "timer",
+					freertos_ret_to_string(status), status);
 		}
 		else
 		{
-			WRITE_CONDITIONAL( !suppressVerbose, "os_timer_deactivate_ex() - Failed to deactivate timer, reason: %s(%d).",
-					ThreadxRetToString(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_timer_deactivate_ex() - Failed to deactivate timer, reason: %s(%d).",
+					freertos_ret_to_string(status), status);
 		}
 	}
 	else if( !suppressVerbose )
 	{
 		if( "timer" )
 		{
-		   WRITE_CONDITIONAL( !suppressVerbose, "os_timer_activate_ex() - Deactivated timer: %s.",
+		   ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_timer_activate_ex() - Deactivated timer: %s.",
 				"timer");
 		}
 		else
 		{
-		   WRITE_CONDITIONAL( !suppressVerbose, "os_timer_activate_ex() - Deactivated un-named timer.");
+		   ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_timer_activate_ex() - Deactivated un-named timer.");
 		}
 	}
 
@@ -779,12 +794,12 @@ bool os_semaphore_create_ex(OS_Semaphore* txSemaphore, const char* name, OS_Uint
 
     if (err == OS_SUCCESS)
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_semaphore_create_ex() - Successfully created semaphore %s.", name);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_create_ex() - Successfully created semaphore %s.", name);
         return true;
     }
     else
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_semaphore_create_ex() - Failed to create semaphore - %s - Failure: %s(%d).", name, ThreadxRetToString(err), err);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_create_ex() - Failed to create semaphore - %s - Failure: %s(%d).", name, freertos_ret_to_string(err), err);
         // TBD: log appropriate error here
         return false;
     }
@@ -801,14 +816,14 @@ bool os_semaphore_delete_ex(OS_Semaphore *txSemaphore, bool suppressVerbose) noe
 
     if (err == OS_SUCCESS)
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_semaphore_delete_ex() - Successfully deleted semaphore - %s.",
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_delete_ex() - Successfully deleted semaphore - %s.",
         								"sem");
         return true;
     }
     else
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_semaphore_delete_ex() - Failed to delete semaphore - %s - Failure: %s(%d).",
-        								"sem" , ThreadxRetToString(err), err);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_delete_ex() - Failed to delete semaphore - %s - Failure: %s(%d).",
+        								"sem" , freertos_ret_to_string(err), err);
         // TBD: log appropriate error here
         return false;
     }
@@ -825,12 +840,12 @@ bool os_semaphore_put_ex(OS_Semaphore* txSemaphore, bool suppressVerbose) noexce
 
     if (err == OS_SUCCESS)
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_semaphore_put_ex() - Successfully put semaphore - %s.", "sem");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_put_ex() - Successfully put semaphore - %s.", "sem");
         return true;
     }
     else
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_semaphore_put_ex() - Failed to put semaphore - %s - Failure: %s(%d).", "sem", ThreadxRetToString(err), err);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_put_ex() - Failed to put semaphore - %s - Failure: %s(%d).", "sem", freertos_ret_to_string(err), err);
         // TBD: log appropriate error here
         return false;
     }
@@ -848,12 +863,12 @@ bool os_semaphore_get_ex(OS_Semaphore* txSemaphore, OS_Ulong wait_option, bool s
 
     if (err == OS_SUCCESS)
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_semaphore_get_ex() - Successfully got semaphore - %s.", "sem");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_get_ex() - Successfully got semaphore - %s.", "sem");
         return true;
     }
     else
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_semaphore_get_ex() - Failed to get semaphore - %s - Failure: %s(%d).", "sem", ThreadxRetToString(err), err);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_get_ex() - Failed to get semaphore - %s - Failure: %s(%d).", "sem", freertos_ret_to_string(err), err);
         // TBD: log appropriate error here
         return false;
     }
@@ -867,18 +882,18 @@ bool os_semaphore_get_ex(OS_Semaphore* txSemaphore, OS_Ulong wait_option, bool s
 OS_Ulong os_semaphore_get_count_ex(OS_Semaphore *txSemaphore, bool suppressVerbose) noexcept
 {
     OS_Ulong count;
-    OS_Uint err = os_semaphore_info_get(txSemaphore, nullptr, &count, nullptr, nullptr, nullptr);
+    OS_Uint err = os_semaphore_info_get(txSemaphore, &count);
 
     if (err == OS_SUCCESS)
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_semaphore_get_count_ex() - Successfully got semaphore count - &s - %lu.",
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_get_count_ex() - Successfully got semaphore count - &s - %lu.",
 										"sem" , count);
         return count;
     }
     else
     {
-        WRITE_CONDITIONAL(!suppressVerbose, "os_semaphore_get_count_ex() - Failed to get semaphore count - &s - Failure: %s(%d).",
-										"sem" , ThreadxRetToString(err), err);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_get_count_ex() - Failed to get semaphore count - &s - Failure: %s(%d).",
+										"sem" , freertos_ret_to_string(err), err);
         // TBD: log appropriate error here
         return 0;
     }
@@ -906,16 +921,16 @@ bool os_event_flags_create_ex(OS_EventGroup& eventFlags, const char* name, bool 
         }
         else
         {
-       //     WRITE_CONDITIONAL( !suppressVerbose, "os_event_flags_create_ex() - Failed for %s, reason: %s(%d).",
-       //             name, ThreadxRetToString(status), status);
+       //     ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_event_flags_create_ex() - Failed for %s, reason: %s(%d).",
+       //             name, freertos_ret_to_string(status), status);
 
-        	ConsolePort::Write( "os_event_flags_create_ex() - Failed for %s, reason: %s(%d).",
-        	  name, ThreadxRetToString(status), status);
+        	ConsolePort::Write("OsUtility",  "os_event_flags_create_ex() - Failed for %s, reason: %s(%d).",
+        	  name, freertos_ret_to_string(status), status);
         }
     }
     else
     {
-        WRITE_CONDITIONAL( !suppressVerbose, "os_event_flags_create_ex() - Null pointer passed for event flag group name.");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_event_flags_create_ex() - Null pointer passed for event flag group name.");
     }
 
     // TODO: Error Handling
@@ -934,11 +949,11 @@ bool os_event_flags_delete_ex(OS_EventGroup& eventFlags, bool suppressVerbose) n
     {
         if("evt")
         {
-            WRITE_CONDITIONAL( !suppressVerbose, "os_event_flags_delete_ex() - Failed to delete event flag group: %s, reason: %s(%d).",  "evt", ThreadxRetToString(status), status);
+            ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_event_flags_delete_ex() - Failed to delete event flag group: %s, reason: %s(%d).",  "evt", freertos_ret_to_string(status), status);
         }
         else
         {
-            WRITE_CONDITIONAL( !suppressVerbose, "os_event_flags_delete_ex() - Failed to delete event flag group, reason: %s(%d)", ThreadxRetToString(status), status);
+            ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_event_flags_delete_ex() - Failed to delete event flag group, reason: %s(%d)", freertos_ret_to_string(status), status);
         }
         return false;
     }
@@ -953,12 +968,12 @@ bool os_event_flags_delete_ex(OS_EventGroup& eventFlags, bool suppressVerbose) n
  * @param flagsToSet - The flags to set
  */
 bool os_event_flags_set_ex(OS_EventGroup& eventFlags, OS_Ulong flagsToSet, bool suppressVerbose) noexcept {
-    OS_Uint status = os_event_group_set(&eventFlags, flagsToSet, OS_OR);
+    OS_Uint status = os_event_group_set(&eventFlags, flagsToSet);
     if (status == OS_SUCCESS) {
-        WRITE_CONDITIONAL( !suppressVerbose, "os_event_flags_set_ex() - Successfully set event flags in group: %s.", "evt");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_event_flags_set_ex() - Successfully set event flags in group: %s.", "evt");
         return true;
     } else {
-        WRITE_CONDITIONAL( !suppressVerbose, "os_event_flags_set_ex() - Failed to set event flags in group: %s, error code: %u .", "evt", status);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_event_flags_set_ex() - Failed to set event flags in group: %s, error code: %u .", "evt", status);
         return false;
     }
 }
@@ -970,12 +985,12 @@ bool os_event_flags_set_ex(OS_EventGroup& eventFlags, OS_Ulong flagsToSet, bool 
  * @param flagsToClear - The flags to clear
  */
 bool os_event_flags_clear_ex(OS_EventGroup& eventFlags, OS_Ulong flagsToClear, bool suppressVerbose) noexcept {
-    OS_Uint status = os_event_group_set(&eventFlags, flagsToClear, OS_AND);
+    OS_Uint status = os_event_group_clear(&eventFlags, flagsToClear);
     if (status == OS_SUCCESS) {
-        WRITE_CONDITIONAL( !suppressVerbose, "os_event_flags_set_ex() - Successfully cleared event flags in group: %s.", "evt");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_event_flags_clear_ex() - Successfully cleared event flags in group: %s.", "evt");
         return true;
     } else {
-        WRITE_CONDITIONAL( !suppressVerbose, "os_event_flags_set_ex() - Failed to clear event flags in group: %s, error code: %u .", "evt", status);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_event_flags_clear_ex() - Failed to clear event flags in group: %s, error code: %u .", "evt", status);
         return false;
     }
 }
@@ -993,10 +1008,10 @@ bool os_event_flags_get_ex(OS_EventGroup& eventFlags, OS_Ulong flagsToGet, OS_Ui
                      OS_Ulong& actualFlags, OS_Ulong wait_option, bool suppressVerbose) noexcept {
     OS_Uint status = os_event_group_get(&eventFlags, flagsToGet, getOption, &actualFlags, wait_option);
     if (status == OS_SUCCESS) {
-        WRITE_CONDITIONAL( !suppressVerbose, "os_event_flags_get_ex() - Successfully got event flags from group: %s.", "evt");
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_event_flags_get_ex() - Successfully got event flags from group: %s.", "evt");
         return true;
     } else {
-        WRITE_CONDITIONAL( !suppressVerbose, "os_event_flags_get_ex() - Failed to get event flags from group: %s, error code: %u .", "evt", status);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_event_flags_get_ex() - Failed to get event flags from group: %s, error code: %u .", "evt", status);
         return false;
     }
 }
@@ -1007,10 +1022,10 @@ bool os_event_flags_get_ex(OS_EventGroup& eventFlags, OS_Ulong flagsToGet, OS_Ui
 
 void os_stack_fault_handler(OS_Thread* thread )
 {
-	ConsolePort::Write( "==||***********************************************||==");
-	ConsolePort::Write( "==||************  THREAD STACK FAULT   ************||==");
-	ConsolePort::Write( "==||***********************************************||==");
-	ConsolePort::Write( "==||os_stack_fault_handler() - Thread: %s.", "thread");
-	ConsolePort::Write( "==||***********************************************||==");
+	ConsolePort::Write("OsUtility",  "==||***********************************************||==");
+	ConsolePort::Write("OsUtility",  "==||************  THREAD STACK FAULT   ************||==");
+	ConsolePort::Write("OsUtility",  "==||***********************************************||==");
+	ConsolePort::Write("OsUtility",  "==||os_stack_fault_handler() - Thread: %s.", "thread");
+	ConsolePort::Write("OsUtility",  "==||***********************************************||==");
 }
 

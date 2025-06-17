@@ -17,10 +17,6 @@
 #define OS_QUEUE_H_
 
 #include "OsAbstraction.h"
-
-#include "ConsolePort.h"
-
-#include "ThingsToString.h"
 #include "Utility.h"
 #include "OsUtility.h"
 
@@ -85,7 +81,6 @@ public:
         	MutexGuard guard((OS_Mutex*)&mtx);
         	return os_queue_send_ex(queue, &message, wait_option);
         }
-        ConsolePort::WriteConditional(verbose, "OsQueue::Send() - [%s] Queue not initialized.", name);
         return false;
     }
 
@@ -102,7 +97,6 @@ public:
         	MutexGuard guard((OS_Mutex*)&mtx);
         	return os_queue_receive_ex(queue, &message, wait_option);
         }
-        ConsolePort::WriteConditional(verbose, "OsQueue::Receive() - [%s] Queue not initialized.", name);
         return false;
     }
 

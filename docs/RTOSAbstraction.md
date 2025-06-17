@@ -4,6 +4,7 @@
 
 `OsAbstraction` and `OsUtility` hide the direct FreeRTOS types behind a minimal interface. This makes it easier to port the component to other RTOSes in the future.
 
+This wrapper targets FreeRTOS kernel version 11.1.x and is designed to match its APIs.
 ## Highlights
 - Thin typedefs for tasks, queues and mutexes.
 - New stream buffer helpers for variable-length data.

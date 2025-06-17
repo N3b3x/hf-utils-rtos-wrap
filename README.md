@@ -7,6 +7,7 @@ Why use it? FreeRTOS can be verbose and repetitive. These utilities keep your ap
 neat while remaining fully compatible with ESP‑IDF. From threads to queues and now timers,
 everything lives under one portable umbrella.
 
+Compatible with FreeRTOS kernel 11.1.x.
 Looking for guides? Head over to the [documentation index](docs/index.md).
 
 ## 📜 Table of Contents

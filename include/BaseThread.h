@@ -19,6 +19,7 @@
 #define BaseThread_H
 
 #include <memory>
+#include <atomic>
 #include "OsAbstraction.h"
 #include "ConsolePort.h"
 #include "OsUtility.h"

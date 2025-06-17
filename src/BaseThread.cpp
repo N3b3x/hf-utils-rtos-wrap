@@ -67,7 +67,7 @@ BaseThread::~BaseThread()
 {
 	if( osThreadCreated )
 	{
-		WRITE_CONDITIONAL(verbose,"BaseThread::~BaseThread() - Deleting %s.", osThreadName);
+		WRITE_CONDITIONAL(verbose,"BaseThread::~BaseThread()",  "- Deleting %s.", osThreadName);
 
 		os_thread_delete_ex( &osThread);
 	}
@@ -117,7 +117,7 @@ bool BaseThread::CreateBaseThread( uint8_t* stack, OS_Ulong stackSizeBytes,
 	   }
 	   else
 	   {
-		   consolePort.Write("BaseThread::CreateBaseThread() - Failed to create %s.", osThreadName);
+		   WRITE_CONDITIONAL(true,"BaseThread::CreateBaseThread() - Failed to create %s.", osThreadName);
 		   os_delay_msec( 5 );
 		   return false;
 	   }

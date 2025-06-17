@@ -47,19 +47,11 @@ MutexGuard::MutexGuard(OS_Mutex* mutexArg, bool* pSuccess) :
 	{
 		if( mutexArg)
 		{
-			if( mutexArg->"mutex" )
-			{
-				WRITE_CONDITIONAL(verbose, "MutexGuard(*)", " Failed to lock mutex: %s after %u msec",
-						mutexArg->"mutex", maxMsecToWait );
-			}
-			else
-			{
-				WRITE_CONDITIONAL(verbose, "MutexGuard(*)", " Failed to lock un-named mutex, reasons." );
-			}
+			WRITE_CONDITIONAL(verbose, "MutexGuard", " Failed to lock mutex after %u msec", maxMsecToWait );
 		}
 		else
 		{
-			WRITE_CONDITIONAL(verbose, "MutexGuard(*)", "Invalid mutex." );
+			WRITE_CONDITIONAL(verbose, "MutexGuard", "%s", " Invalid mutex." );
 		}
 	}
 
@@ -82,18 +74,11 @@ MutexGuard::MutexGuard(OS_Mutex& mutexArg, bool* pSuccess) :
         OS_Uint result = os_mutex_get_ex(mutexArg, os_convert_msec_to_delay_ticks(maxMsecToWait), !verbose);
 	if( !result )
 	{
-		if( mutexArg."mutex" )
-		{
-			ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&)", " Failed to lock mutex: %s after %u msec", mutexArg."mutex", maxMsecToWait );
-		}
-		else
-		{
-			ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&)", " Failed to lock un-named mutex, reasons." );
-		}
+		ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %u msec", maxMsecToWait );
 	}
 	else
 	{
-		ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&)", " Successfully locked mutex: %s after %u msec", mutexArg."mutex", maxMsecToWait );
+		ConsolePort::WriteConditional(verbose, "MutexGuard", " Successfully locked mutex after %u msec", maxMsecToWait );
 	}
 
 	/// Return true in pointer if successful.
@@ -129,21 +114,21 @@ MutexGuard::MutexGuard(OS_Mutex* mutexArg, uint32_t maxMsecToWait, bool* pSucces
 		{
 			if( mutexArg->"mutex" )
 			{
-				ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(*)", " Failed to lock mutex: %s after %u msec", mutexArg->"mutex", maxMsecToWait );
+				ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex: %s after %u msec", mutexArg->"mutex", maxMsecToWait );
 			}
 			else
 			{
-				ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(*)", " Failed to lock un-named mutex, reasons." );
+				ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock un-named mutex, reasons." );
 			}
 		}
 		else
 		{
-			ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(*)", " Invalid mutex." );
+			ConsolePort::WriteConditional(verbose, "MutexGuard", " Invalid mutex." );
 		}
 	}
 	else
 	{
-		ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(*)", " Successfully locked mutex: %s after %u msec", mutexArg->"mutex", maxMsecToWait );
+		ConsolePort::WriteConditional(verbose, "MutexGuard", " Successfully locked mutex: %s after %u msec", mutexArg->"mutex", maxMsecToWait );
 	}
 
 	/// Return true in pointer if successful.
@@ -162,18 +147,11 @@ MutexGuard::MutexGuard(OS_Mutex& mutexArg, uint32_t maxMsecToWait, bool* pSucces
         OS_Uint result = os_mutex_get_ex(mutexArg, os_convert_msec_to_delay_ticks(maxMsecToWait), !verbose);
 	if( !result )
 	{
-		if( mutexArg."mutex" )
-		{
-			ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&)", " Failed to lock mutex: %s after %u msec", mutexArg."mutex", maxMsecToWait );
-		}
-		else
-		{
-			ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&)", " Failed to lock un-named mutex, reasons." );
-		}
+		ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %u msec", maxMsecToWait );
 	}
 	else
 	{
-		ConsolePort::GetInstance().WriteConditional(verbose, "MutexGuard(&)", " Successfully locked mutex: %s after %u msec", mutexArg."mutex", maxMsecToWait );
+		ConsolePort::WriteConditional(verbose, "MutexGuard", " Successfully locked mutex after %u msec", maxMsecToWait );
 	}
 
 	/// Return true in pointer if successful.
@@ -201,20 +179,11 @@ struct MutexUnlocker
 		{
 			if( mutexArg)
 			{
-				if( mutexArg->"mutex" )
-				{
-					ConsolePort::Write("MutexUnlocker()", " Failed to release mutex: %s, reason: %s.",
-							mutexArg->"mutex",ThreadxRetToString(result) );
-				}
-				else
-				{
-					ConsolePort::Write("MutexUnlocker()", " Failed to release un-named mutex, reason: %s.",
-							ThreadxRetToString(result) );
-				}
+				ConsolePort::Write("MutexUnlocker", " Failed to release mutex, reason: %u.", result );
 			}
 			else
 			{
-				ConsolePort::GetInstance().Write("MutexUnlocker()", " Invalid mutex." );
+				ConsolePort::Write("MutexUnlocker", "%s", " Invalid mutex." );
 			}
 		}
 	}

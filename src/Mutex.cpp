@@ -69,13 +69,13 @@ bool Mutex::Lock( uint32_t maxMsecToWait) noexcept
 		}
 		else
 		{
-			ConsolePort::Write("Mutex::Lock() - Failed to lock mutex: %s after %u msec, reason: %s.",
-					mutexName, maxMsecToWait, ThreadxRetToString(result) );
+			ConsolePort::Write("Mutex", "Lock() - Failed to lock mutex: %s after %u msec, reason: %u.",
+					mutexName, maxMsecToWait, result );
 		}
 	}
 	else
 	{
-		ConsolePort::Write("Mutex::Lock() - Invalid mutex." );
+		ConsolePort::Write("Mutex", "%s", "Lock() - Invalid mutex." );
 	}
 	return false;
 }
@@ -94,13 +94,13 @@ bool Mutex::Unlock() noexcept
 		}
 		else
 		{
-			ConsolePort::Write("Mutex::Unlock()- Failed to release mutex: %s, reason: %s.",
-					mutexName, ThreadxRetToString(result) );
+			ConsolePort::Write("Mutex", "Unlock()- Failed to release mutex: %s, reason: %u.",
+					mutexName, result );
 		}
 	}
 	else
 	{
-		ConsolePort::Write("Mutex::Unlock() - Invalid mutex." );
+		ConsolePort::Write("Mutex", "%s", "Unlock() - Invalid mutex." );
 	}
 
 	return false;

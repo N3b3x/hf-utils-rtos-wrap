@@ -59,13 +59,25 @@ public:
     }
 
     /**
-     * @brief printf-style conditional Info-level log.
+     * @brief Static printf-style Info-level log.
+     * @param tag   log tag
+     * @param fmt   printf-style format string
+     * @param ...   printf-style args
+     */
+    static void Write(const char* tag, const char* fmt, ...) {
+        va_list ap; va_start(ap, fmt);
+        esp_log_writev(ESP_LOG_INFO, tag, fmt, ap);
+        va_end(ap);
+    }
+
+    /**
+     * @brief Static printf-style conditional Info-level log.
      * @param cond  only log if true
      * @param tag   log tag
      * @param fmt   printf-style format string
      * @param ...   printf-style args
      */
-    void WriteConditional(bool cond, const char* tag, const char* fmt, ...) const {
+    static void WriteConditional(bool cond, const char* tag, const char* fmt, ...) {
         if (!cond) return;
         va_list ap; va_start(ap, fmt);
         esp_log_writev(ESP_LOG_INFO, tag, fmt, ap);
@@ -80,6 +92,10 @@ private:
     ConsolePort& operator=(const ConsolePort&) = delete;
 };
 
-/** Helper macro for conditional logging via singleton. */
+/** Helper macro for conditional logging via static function. */
 #define WRITE_CONDITIONAL(cond, tag, fmt, ...) \
-    ConsolePort::GetInstance().WriteConditional(cond, tag, fmt, ##__VA_ARGS__)
+    ConsolePort::WriteConditional(cond, tag, fmt, ##__VA_ARGS__)
+
+/** Helper macro for logging via static function. */
+#define WRITE(tag, fmt, ...) \
+    ConsolePort::Write(tag, fmt, ##__VA_ARGS__)

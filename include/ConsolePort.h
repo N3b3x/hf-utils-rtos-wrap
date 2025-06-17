@@ -1,94 +1,85 @@
 #pragma once
 /**
  * @file ConsolePort.h
- * @brief Logging facade that wraps the ESP‑IDF log library.
+ * @brief printf-style ESP-IDF logging with per-call TAG and singleton access.
  *
- * This header provides a small convenience class used throughout the
- * component to output formatted log statements.  All methods are header
- * only and simply forward to the equivalent ESP log functions so the
- * wrapper can be compiled as a lightweight inline utility.
+ * All methods forward to esp_log_writev for true printf semantics.
  */
 
 #include "esp_log.h"
 #include <cstdarg>
 
-/**
- * @brief Provides lightweight formatted logging functions.
- */
-class ConsolePort
-{
+class ConsolePort {
 public:
-    /**
-     * @brief Retrieve singleton instance.
-     * @return Reference to the global ConsolePort instance.
-     */
-    static ConsolePort& GetInstance()
-    {
+    /// Retrieve the singleton instance
+    static ConsolePort& GetInstance() {
         static ConsolePort inst;
         return inst;
     }
 
     /**
-     * @brief Set the log level for the component.
-     * @param level Log level as defined by esp_log_level_t.
+     * @brief Change the runtime log level for a given TAG.
+     * @param tag   null-terminated string tag
+     * @param level one of ESP_LOG_NONE, ESP_LOG_ERROR, ESP_LOG_WARN, ESP_LOG_INFO, ESP_LOG_DEBUG, ESP_LOG_VERBOSE
      */
-    void SetLevel(esp_log_level_t level) const { esp_log_level_set(TAG, level); }
+    void SetLevel(const char* tag, esp_log_level_t level) const {
+        esp_log_level_set(tag, level);
+    }
 
-    /** @name Logging helpers */
+    /** @name printf-style logging APIs (specify tag per call) */
     ///@{
-
-    /** Info level output. */
-    template<typename... Args>
-    void Info(const char* fmt, Args... args) const
-    {
-        ESP_LOGI(TAG, fmt, args...);
+    void Info(const char* tag, const char* fmt, ...) const {
+        va_list ap; va_start(ap, fmt);
+        esp_log_writev(ESP_LOG_INFO,    tag, fmt, ap);
+        va_end(ap);
     }
 
-    /** Warning level output. */
-    template<typename... Args>
-    void Warn(const char* fmt, Args... args) const
-    {
-        ESP_LOGW(TAG, fmt, args...);
+    void Warn(const char* tag, const char* fmt, ...) const {
+        va_list ap; va_start(ap, fmt);
+        esp_log_writev(ESP_LOG_WARN,    tag, fmt, ap);
+        va_end(ap);
     }
 
-    /** Error level output. */
-    template<typename... Args>
-    void Error(const char* fmt, Args... args) const
-    {
-        ESP_LOGE(TAG, fmt, args...);
+    void Error(const char* tag, const char* fmt, ...) const {
+        va_list ap; va_start(ap, fmt);
+        esp_log_writev(ESP_LOG_ERROR,   tag, fmt, ap);
+        va_end(ap);
     }
 
-    /** Debug level output. */
-    template<typename... Args>
-    void Debug(const char* fmt, Args... args) const
-    {
-        ESP_LOGD(TAG, fmt, args...);
+    void Debug(const char* tag, const char* fmt, ...) const {
+        va_list ap; va_start(ap, fmt);
+        esp_log_writev(ESP_LOG_DEBUG,   tag, fmt, ap);
+        va_end(ap);
     }
 
-    /** Verbose level output. */
-    template<typename... Args>
-    void Verbose(const char* fmt, Args... args) const
-    {
-        ESP_LOGV(TAG, fmt, args...);
+    void Verbose(const char* tag, const char* fmt, ...) const {
+        va_list ap; va_start(ap, fmt);
+        esp_log_writev(ESP_LOG_VERBOSE, tag, fmt, ap);
+        va_end(ap);
     }
 
-    /** Info level output when condition is true. */
-    template<typename... Args>
-    void WriteConditional(bool cond, const char* fmt, Args... args) const
-    {
-        if (cond) {
-            ESP_LOGI(TAG, fmt, args...);
-        }
+    /**
+     * @brief printf-style conditional Info-level log.
+     * @param cond  only log if true
+     * @param tag   log tag
+     * @param fmt   printf-style format string
+     * @param ...   printf-style args
+     */
+    void WriteConditional(bool cond, const char* tag, const char* fmt, ...) const {
+        if (!cond) return;
+        va_list ap; va_start(ap, fmt);
+        esp_log_writev(ESP_LOG_INFO, tag, fmt, ap);
+        va_end(ap);
     }
-
     ///@}
 
 private:
     ConsolePort() = default;
-    static constexpr const char* TAG = "ConsolePort";
+    ~ConsolePort() = default;
+    ConsolePort(const ConsolePort&) = delete;
+    ConsolePort& operator=(const ConsolePort&) = delete;
 };
 
-/** Helper macro used throughout the component to log conditionally. */
-#define WRITE_CONDITIONAL(cond, fmt, ...) \
-    ConsolePort::GetInstance().WriteConditional(cond, fmt, ##__VA_ARGS__)
-
+/** Helper macro for conditional logging via singleton. */
+#define WRITE_CONDITIONAL(cond, tag, fmt, ...) \
+    ConsolePort::GetInstance().WriteConditional(cond, tag, fmt, ##__VA_ARGS__)

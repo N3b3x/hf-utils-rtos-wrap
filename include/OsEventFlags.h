@@ -9,10 +9,6 @@
 #define OS_EVENT_FLAGS_H_
 
 #include "OsAbstraction.h"
-
-#include "ConsolePort.h"
-
-#include "ThingsToString.h"
 #include "Utility.h"
 #include "OsUtility.h"
 
@@ -70,7 +66,6 @@ public:
             MutexGuard guard((OS_Mutex*)&mtx);
             return os_event_flags_set_ex(group, flagsToSet);
         }
-        ConsolePort::WriteConditional(verbose, "OsEventFlags::Set() - [%s] Event flags not initialized.", name);
         return false;
     }
 
@@ -87,7 +82,6 @@ public:
             MutexGuard guard((OS_Mutex*)&mtx);
             return os_event_flags_get_ex(group, flagsToGet, getOption, actualFlags, wait_option);
         }
-        ConsolePort::WriteConditional(verbose, "OsEventFlags::Get() - [%s] Event flags not initialized.", name);
         return false;
     }
 

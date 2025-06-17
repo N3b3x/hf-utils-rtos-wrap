@@ -100,21 +100,21 @@ static inline OS_Uint os_thread_sleep(OS_Ulong ticks)  { vTaskDelay(ticks); retu
 static inline OS_Uint os_mutex_create(OS_Mutex *m, const char * /*name*/, OS_Uint /*inherit*/)
 {
     *m = xSemaphoreCreateMutex();
-    return (*m) ? OS_SUCCESS : 1;
+    return (*m) ? (OS_Uint)OS_SUCCESS : (OS_Uint)1;
 }
-static inline OS_Uint os_mutex_get(OS_Mutex *m, OS_Ulong wait)   { return xSemaphoreTake(*m, wait) ? OS_SUCCESS : 1; }
-static inline OS_Uint os_mutex_put(OS_Mutex *m)                  { return xSemaphoreGive(*m) ? OS_SUCCESS : 1; }
+static inline OS_Uint os_mutex_get(OS_Mutex *m, OS_Ulong wait)   { return xSemaphoreTake(*m, wait) ? (OS_Uint)OS_SUCCESS : (OS_Uint)1; }
+static inline OS_Uint os_mutex_put(OS_Mutex *m)                  { return xSemaphoreGive(*m) ? (OS_Uint)OS_SUCCESS : (OS_Uint)1; }
 static inline OS_Uint os_mutex_delete(OS_Mutex *m)               { vSemaphoreDelete(*m); return OS_SUCCESS; }
 
 /* Semaphore wrappers -----------------------------------------------------*/
 static inline OS_Uint os_semaphore_create(OS_Semaphore *s, const char* /*name*/, OS_Uint initial)
 {
     *s = xSemaphoreCreateCounting(UINT16_MAX, initial);
-    return (*s) ? OS_SUCCESS : 1;
+    return (*s) ? (OS_Uint)OS_SUCCESS : (OS_Uint)1;
 }
 static inline OS_Uint os_semaphore_delete(OS_Semaphore *s)   { vSemaphoreDelete(*s); return OS_SUCCESS; }
-static inline OS_Uint os_semaphore_put(OS_Semaphore *s)      { return xSemaphoreGive(*s) ? OS_SUCCESS : 1; }
-static inline OS_Uint os_semaphore_get(OS_Semaphore *s, OS_Ulong wait) { return xSemaphoreTake(*s, wait) ? OS_SUCCESS : 1; }
+static inline OS_Uint os_semaphore_put(OS_Semaphore *s)      { return xSemaphoreGive(*s) ? (OS_Uint)OS_SUCCESS : (OS_Uint)1; }
+static inline OS_Uint os_semaphore_get(OS_Semaphore *s, OS_Ulong wait) { return xSemaphoreTake(*s, wait) ? (OS_Uint)OS_SUCCESS : (OS_Uint)1; }
 static inline OS_Uint os_semaphore_info_get(OS_Semaphore *s, OS_Ulong *count)
 {
     if (count)
@@ -127,17 +127,17 @@ static inline OS_Uint os_queue_create(OS_Queue *q, const char* /*name*/, OS_Uint
                                       void* /*store*/, OS_Ulong length)
 {
     *q = xQueueCreate(length, item_words * sizeof(uint32_t));
-    return (*q) ? OS_SUCCESS : 1;
+    return (*q) ? (OS_Uint)OS_SUCCESS : (OS_Uint)1;
 }
 static inline OS_Uint os_queue_delete(OS_Queue *q)    { vQueueDelete(*q); return OS_SUCCESS; }
-static inline OS_Uint os_queue_send(OS_Queue *q, void *msg, OS_Ulong wait)    { return xQueueSend(*q, msg, wait) ? OS_SUCCESS : 1; }
-static inline OS_Uint os_queue_receive(OS_Queue *q, void *msg, OS_Ulong wait) { return xQueueReceive(*q, msg, wait) ? OS_SUCCESS : 1; }
+static inline OS_Uint os_queue_send(OS_Queue *q, void *msg, OS_Ulong wait)    { return xQueueSend(*q, msg, wait) ? (OS_Uint)OS_SUCCESS : (OS_Uint)1; }
+static inline OS_Uint os_queue_receive(OS_Queue *q, void *msg, OS_Ulong wait) { return xQueueReceive(*q, msg, wait) ? (OS_Uint)OS_SUCCESS : (OS_Uint)1; }
 
 /* Event group wrappers ---------------------------------------------------*/
 static inline OS_Uint os_event_group_create(OS_EventGroup *g, const char* /*name*/)
 {
     *g = xEventGroupCreate();
-    return (*g) ? OS_SUCCESS : 1;
+    return (*g) ? (OS_Uint)OS_SUCCESS : (OS_Uint)1;
 }
 static inline OS_Uint os_event_group_delete(OS_EventGroup *g) { vEventGroupDelete(*g); return OS_SUCCESS; }
 static inline OS_Uint os_event_group_set(OS_EventGroup *g, OS_Ulong flags)
@@ -202,7 +202,7 @@ static inline OS_Uint os_stream_buffer_create(OS_StreamBuffer *b, size_t capacit
 }
 static inline OS_Uint os_stream_buffer_delete(OS_StreamBuffer *b) { vStreamBufferDelete(*b); return OS_SUCCESS; }
 static inline OS_Uint os_stream_buffer_send(OS_StreamBuffer *b, const void *data, size_t len, OS_Ulong wait)
-{ return xStreamBufferSend(*b, data, len, wait) == len ? OS_SUCCESS : 1; }
+{ return xStreamBufferSend(*b, data, len, wait) == len ? (OS_Uint)OS_SUCCESS : (OS_Uint)1; }
 static inline OS_Uint os_stream_buffer_receive(OS_StreamBuffer *b, void *data, size_t len, OS_Ulong wait)
 { return xStreamBufferReceive(*b, data, len, wait) > 0 ? OS_SUCCESS : 1; }
 

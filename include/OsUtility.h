@@ -14,8 +14,6 @@
 #define OS_UTILITY_H_
 
 #include "OsAbstraction.h"
-
-#include "CommonIDs.h"
 #include "Utility.h"
 
 #define UTIL_SYSTEM_CLOCK (240000000.0)	//240MHz

@@ -47,7 +47,7 @@ MutexGuard::MutexGuard(OS_Mutex* mutexArg, bool* pSuccess) :
 	{
 		if( mutexArg)
 		{
-			ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %u msec", maxMsecToWait );
+			ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %lu msec", maxMsecToWait );
 		}
 		else
 		{
@@ -74,11 +74,11 @@ MutexGuard::MutexGuard(OS_Mutex& mutexArg, bool* pSuccess) :
         OS_Uint result = os_mutex_get_ex(mutexArg, os_convert_msec_to_delay_ticks(maxMsecToWait), !verbose);
 	if( !result )
 	{
-		ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %u msec", maxMsecToWait );
+		ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %lu msec", maxMsecToWait );
 	}
 	else
 	{
-		ConsolePort::WriteConditional(verbose, "MutexGuard", " Successfully locked mutex after %u msec", maxMsecToWait );
+		ConsolePort::WriteConditional(verbose, "MutexGuard", " Successfully locked mutex after %lu msec", maxMsecToWait );
 	}
 
 	/// Return true in pointer if successful.
@@ -114,7 +114,7 @@ MutexGuard::MutexGuard(OS_Mutex* mutexArg, uint32_t maxMsecToWait, bool* pSucces
 		{
 			if( *mutexArg )
 			{
-				ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %u msec", maxMsecToWait );
+				ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %lu msec", maxMsecToWait );
 			}
 			else
 			{
@@ -128,7 +128,7 @@ MutexGuard::MutexGuard(OS_Mutex* mutexArg, uint32_t maxMsecToWait, bool* pSucces
 	}
 	else
 	{
-		ConsolePort::WriteConditional(verbose, "MutexGuard", " Successfully locked mutex after %u msec", maxMsecToWait );
+		ConsolePort::WriteConditional(verbose, "MutexGuard", " Successfully locked mutex after %lu msec", maxMsecToWait );
 	}
 
 	/// Return true in pointer if successful.
@@ -147,11 +147,11 @@ MutexGuard::MutexGuard(OS_Mutex& mutexArg, uint32_t maxMsecToWait, bool* pSucces
         OS_Uint result = os_mutex_get_ex(mutexArg, os_convert_msec_to_delay_ticks(maxMsecToWait), !verbose);
 	if( !result )
 	{
-		ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %u msec", maxMsecToWait );
+		ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %lu msec", maxMsecToWait );
 	}
 	else
 	{
-		ConsolePort::WriteConditional(verbose, "MutexGuard", " Successfully locked mutex after %u msec", maxMsecToWait );
+		ConsolePort::WriteConditional(verbose, "MutexGuard", " Successfully locked mutex after %lu msec", maxMsecToWait );
 	}
 
 	/// Return true in pointer if successful.

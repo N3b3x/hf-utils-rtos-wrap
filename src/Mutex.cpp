@@ -69,7 +69,7 @@ bool Mutex::Lock( uint32_t maxMsecToWait) noexcept
 		}
 		else
 		{
-			ConsolePort::Write("Mutex", "Lock() - Failed to lock mutex: %s after %u msec, reason: %u.",
+			ConsolePort::Write("Mutex", "Lock() - Failed to lock mutex: %s after %lu msec, reason: %u.",
 					mutexName, maxMsecToWait, result );
 		}
 	}

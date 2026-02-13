@@ -99,14 +99,14 @@ private:
     }
 
     bool initialized; ///< Whether the event flags have been initialized
+    bool groupCreated;
+    bool mutexCreated;
+    const char *name;
 
     OS_EventGroup group; 	///< The OS event flags
-    bool groupCreated;
-    const char *name;
 
     OS_Mutex mtx;
     static const char mutexName[];
-    bool mutexCreated;
 
     static constexpr bool verbose = true;
 

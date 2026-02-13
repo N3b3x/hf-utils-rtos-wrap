@@ -34,7 +34,7 @@ void os_delay_msec( uint16_t msec )
 	uint32_t result = os_thread_sleep (ticks);
 	if( result != OS_SUCCESS )
 	{
-		console_error("OsUtility", "os_delay_msec() - Failed to sleep for %u msec, reason: %s.", msec, freertos_ret_to_string(result));
+		ConsolePort::Write("OsUtility", "os_delay_msec() - Failed to sleep for %u msec, reason: %s.", msec, freertos_ret_to_string(result));
 	}
 }
 
@@ -220,12 +220,12 @@ bool os_mutex_get_ex(OS_Mutex& mutex, OS_Ulong wait_option, bool suppressVerbose
 
     if (err == OS_SUCCESS)
     {
-        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_get_ex() - Successfully acquired mutex - %s.", mutex);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_get_ex() - Successfully acquired mutex - %p.", mutex);
         return true;
     }
     else
     {
-        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_get_ex() - Failed to acquire mutex - %s - Error: %s(%d).", mutex, freertos_ret_to_string(err), err);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_get_ex() - Failed to acquire mutex - %p - Error: %s(%d).", mutex, freertos_ret_to_string(err), err);
         // TBD: Log appropriate error here
         return false;
     }
@@ -244,12 +244,12 @@ bool os_mutex_get_p(OS_Mutex* mutex, OS_Ulong wait_option, bool suppressVerbose)
 
     if (err == OS_SUCCESS)
     {
-        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_get_ex() - Successfully acquired mutex - %s.", mutex);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_get_ex() - Successfully acquired mutex - %p.", mutex);
         return true;
     }
     else
     {
-        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_get_ex() - Failed to acquire mutex - %s - Error: %s(%d).", mutex, freertos_ret_to_string(err), err);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_get_ex() - Failed to acquire mutex - %p - Error: %s(%d).", mutex, freertos_ret_to_string(err), err);
         // TBD: Log appropriate error here
         return false;
     }
@@ -267,12 +267,12 @@ bool os_mutex_put_ex(OS_Mutex& mutex, bool suppressVerbose) noexcept
 
     if (err == OS_SUCCESS)
     {
-        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_put_ex() - Successfully released mutex - %s.", mutex);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_put_ex() - Successfully released mutex - %p.", mutex);
         return true;
     }
     else
     {
-        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_put_ex() - Failed to release mutex - %s - Error: %s(%d).", mutex, freertos_ret_to_string(err), err);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_put_ex() - Failed to release mutex - %p - Error: %s(%d).", mutex, freertos_ret_to_string(err), err);
         // TBD: Log appropriate error here
         return false;
     }
@@ -290,12 +290,12 @@ bool os_mutex_put_p(OS_Mutex* mutex, bool suppressVerbose) noexcept
 
     if (err == OS_SUCCESS)
     {
-        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_put_ex() - Successfully released mutex - %s.", mutex);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_put_ex() - Successfully released mutex - %p.", mutex);
         return true;
     }
     else
     {
-        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_put_ex() - Failed to release mutex - %s - Error: %s(%d).", mutex, freertos_ret_to_string(err), err);
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_put_ex() - Failed to release mutex - %p - Error: %s(%d).", mutex, freertos_ret_to_string(err), err);
         // TBD: Log appropriate error here
         return false;
     }
@@ -313,7 +313,7 @@ bool os_mutex_delete_ex(OS_Mutex& mutex, bool suppressVerbose) noexcept
 	{
 		if( mutex )
 		{
-			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_delete_ex() - Failed to delete mutex: %s, reason: %s(%d).",  mutex, freertos_ret_to_string(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_delete_ex() - Failed to delete mutex: %p, reason: %s(%d).",  mutex, freertos_ret_to_string(status), status);
 		}
 		else
 		{
@@ -337,7 +337,7 @@ bool os_mutex_delete_p(OS_Mutex* mutex, bool suppressVerbose) noexcept
 	{
 		if( mutex )
 		{
-			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_delete_ex() - Failed to delete mutex: %s, reason: %s(%d).",  mutex, freertos_ret_to_string(status), status);
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_mutex_delete_ex() - Failed to delete mutex: %p, reason: %s(%d).",  mutex, freertos_ret_to_string(status), status);
 		}
 		else
 		{
@@ -357,7 +357,8 @@ bool os_mutex_delete_p(OS_Mutex* mutex, bool suppressVerbose) noexcept
 // THREAD COUNTS
 //================//
 
-extern uint32_t g_ssp_common_thread_count;      /**< External variable representing the common thread count in SSP. */
+/// Provide a default definition if not supplied by higher-level code (weak symbol).
+__attribute__((weak)) uint32_t g_ssp_common_thread_count = 0;
 
 /**
  * @brief Function to Create TX thread.
@@ -661,7 +662,7 @@ bool os_timer_create_ex ( OS_Timer& timer, const char* name, void (*callback)(ui
 				rescheduleTimeoutTicks, autoActivate);
 		if (status == OS_SUCCESS)
 		{
-			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility",  "os_timer_create_ex() - Successfully created timer: %s (%s), address: %p, Expiration Input: %u.",
+			ConsolePort::WriteConditional(!suppressVerbose, "OsUtility",  "os_timer_create_ex() - Successfully created timer: %s (%s), address: %p, Expiration Input: %lu.",
 				name, "timer", &timer, callbackExpirationInput);
 			return true;
 		}
@@ -886,13 +887,13 @@ OS_Ulong os_semaphore_get_count_ex(OS_Semaphore *txSemaphore, bool suppressVerbo
 
     if (err == OS_SUCCESS)
     {
-        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_get_count_ex() - Successfully got semaphore count - &s - %lu.",
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_get_count_ex() - Successfully got semaphore count - %s - %lu.",
 										"sem" , count);
         return count;
     }
     else
     {
-        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_get_count_ex() - Failed to get semaphore count - &s - Failure: %s(%d).",
+        ConsolePort::WriteConditional(!suppressVerbose, "OsUtility", "os_semaphore_get_count_ex() - Failed to get semaphore count - %s - Failure: %s(%d).",
 										"sem" , freertos_ret_to_string(err), err);
         // TBD: log appropriate error here
         return 0;

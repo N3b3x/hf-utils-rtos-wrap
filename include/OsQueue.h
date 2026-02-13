@@ -114,18 +114,17 @@ private:
 	}
 
     bool initialized; ///< Whether the queue has been initialized
+    bool queueCreated;
+    bool mutexCreated;
+    const char *name;
+    uint32_t messageSizeInWords;
 
     OS_Queue queue; 	///< The OS queue
-    bool queueCreated;
-    const char *name;
 
     OS_Mutex mtx;
     static const char mutexName[];
-    bool mutexCreated;
 
     MessageType queue_storage[queueSizeBytes]; ///< The storage for the queue
-
-    uint32_t messageSizeInWords;
 	//==============================================================//
 	// VERBOSE??
 	//==============================================================//

@@ -24,7 +24,6 @@ Looking for guides? Head over to the [documentation index](docs/index.md).
 | 💚 **C & C++ helpers** | Wrappers for FreeRTOS tasks, queues, semaphores and timers. |
 | 💌 **`BaseThread`** | Abstract class simplifying long-running threads with start/stop verification. |
 | 🔒 **Synchronization** | `Mutex`, `MutexGuard`, `SignalSemaphore`, `OsEventFlags` and `CriticalGuard`. |
-| 🖊️ **ConsolePort** | Lightweight logging interface mirroring ESP-IDF macros. |
 | ⏲️ **`PeriodicTimer`** | Easy recurring callbacks using FreeRTOS timers. |
 | 🗄️ **Utility wrappers** | Time helpers, `BaseThreadsManager` and assorted helpers. |
 | 🛡️ **Critical sections** | `CriticalGuard` and low level `os_critical_*` helpers. |
@@ -39,11 +38,9 @@ classDiagram
     class Mutex
     class MutexGuard
     class SignalSemaphore
-    class ConsolePort
     class PeriodicTimer
     BaseThreadsManager --> BaseThread : manages
     BaseThread --> SignalSemaphore : uses
-    BaseThread --> ConsolePort : logs
     BaseThread --> PeriodicTimer : schedules
     MutexGuard --> Mutex : locks
     OsQueue --> Mutex : protected by
@@ -64,6 +61,7 @@ Include headers from `include/` and add the `src/` files to your build system.
 ## Example Usage 💻
 ```cpp
 #include "BaseThread.h"
+#include "esp_log.h"
 
 class MotorTask : public BaseThread {
 public:
@@ -76,7 +74,7 @@ public:
 PeriodicTimer statusTimer;
 
 void StatusCb(uint32_t) {
-    ConsolePort::Info("running\n");
+    ESP_LOGI("app", "running");
 }
 
 void app_main() {

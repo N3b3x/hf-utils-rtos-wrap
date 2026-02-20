@@ -8,11 +8,10 @@ Welcome! This section collects all articles describing the RTOS wrapper. Each pa
 1. [Threading with BaseThread](BaseThread.md)
 2. [Synchronization Primitives](Synchronization.md)
 3. [Message Queues](Queues.md)
-4. [Console Logging](Console.md)
-5. [RTOS Abstraction](RTOSAbstraction.md)
-6. [Periodic Timers](Timers.md)
-7. [Utility Helpers](Utility.md)
-8. 😊 [Critical Guards](Synchronization.md#criticalguard)
+4. [RTOS Abstraction](RTOSAbstraction.md)
+5. [Periodic Timers](Timers.md)
+6. [Utility Helpers](Utility.md)
+7. 😊 [Critical Guards](Synchronization.md#criticalguard)
 
 Enjoy reading and happy coding! 🚀
 

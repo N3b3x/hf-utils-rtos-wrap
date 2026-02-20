@@ -14,7 +14,6 @@
 
 
 #include "Mutex.h"
-#include "ConsolePort.h"
 #include <cstring>
 #include <cstdio>
 /**
@@ -69,13 +68,12 @@ bool Mutex::Lock( uint32_t maxMsecToWait) noexcept
 		}
 		else
 		{
-			ConsolePort::Write("Mutex", "Lock() - Failed to lock mutex: %s after %lu msec, reason: %u.",
-					mutexName, maxMsecToWait, result );
+			// Mutex lock failed (ConsolePort logging removed)
 		}
 	}
 	else
 	{
-		ConsolePort::Write("Mutex", "%s", "Lock() - Invalid mutex." );
+		// Mutex lock failed (ConsolePort logging removed)
 	}
 	return false;
 }
@@ -94,13 +92,12 @@ bool Mutex::Unlock() noexcept
 		}
 		else
 		{
-			ConsolePort::Write("Mutex", "Unlock()- Failed to release mutex: %s, reason: %u.",
-					mutexName, result );
+			// Mutex unlock failed (ConsolePort logging removed)
 		}
 	}
 	else
 	{
-		ConsolePort::Write("Mutex", "%s", "Unlock() - Invalid mutex." );
+		// Mutex unlock failed (ConsolePort logging removed)
 	}
 
 	return false;

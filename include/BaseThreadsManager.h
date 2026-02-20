@@ -17,8 +17,6 @@
 
 #include "OsAbstraction.h"
 
-#include "ConsolePort.h"
-
 #include "OsUtility.h"
 #include "Utility.h"
 #include "BaseThread.h"
@@ -153,10 +151,8 @@ bool BaseThreadsManager<EnumType, MaxCount>::ResumeAll() noexcept
 	{
 		MutexGuard guard(mutex);
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::ResumeAll() - BaseThreads have been requested to Resume.");
 
 		for(auto& threadMap : threadsManaged) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::ResumeAll() - Resuming: %s", enumToString(threadMap.first));
 			threadMap.second->Resume();
 		}
 
@@ -173,14 +169,12 @@ bool BaseThreadsManager<EnumType, MaxCount>::ResumeSelected(const std::vector<En
 	{
 		MutexGuard guard(mutex);
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::ResumeSelected() - Selected BaseThreads have been requested to Resume.");
 
 		for(const auto& enumValue : selectedEnums)
 		{
 			auto threadMap = threadsManaged.find(enumValue);
 			if(threadMap != threadsManaged.end())
 			{
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::ResumeSelected() - Resuming: %s", enumToString(threadMap->first));
 				resumed = threadMap->second->Resume();
 			}
 		}
@@ -196,14 +190,11 @@ bool BaseThreadsManager<EnumType, MaxCount>::StartAll() noexcept
 	 {
 		MutexGuard guard(mutex);
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StartAll() - BaseThreads have been requested to start.");
 
 		for(auto& threadMap : threadsManaged) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAll() - Starting: %s", enumToString(threadMap.first));
 			threadsStartedTracker[threadMap.first] = threadMap.second->Start();
 		}
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StartAll() - All starts commanded, NOT indicated to wait to verify if they all started.");
 
 		return threadsStartedTracker.all();
 	}
@@ -219,20 +210,17 @@ bool BaseThreadsManager<EnumType, MaxCount>::StartSelected(const std::vector<Enu
 	{
 		MutexGuard guard(mutex);
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StartSelected() - Selected BaseThreads have been requested to start.");
 
 		bool allSelectedStarted = true;
 		for(const auto& enumValue : selectedEnums) {
 			auto threadMap = threadsManaged.find(enumValue);
 			if(threadMap != threadsManaged.end()) {
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartSelected() - Starting: %s", enumToString(threadMap->first));
 				bool started = threadMap->second->Start();
 				allSelectedStarted = allSelectedStarted && started;
 				threadsStartedTracker[threadMap->first] = started;
 			}
 		}
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StartSelected() - All selected starts commanded, NOT indicated to wait to verify if they all started.");
 
 		return allSelectedStarted;
 	}
@@ -247,7 +235,6 @@ bool BaseThreadsManager<EnumType, MaxCount>::StartAllExceptSelected(const std::v
 	{
 		MutexGuard guard(mutex);
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StartAllExceptSelected() - All BaseThreads except selected have been requested to start.");
 
 		bool allExceptSelectedStarted = true;
 		/// Go through all threads managed
@@ -255,16 +242,13 @@ bool BaseThreadsManager<EnumType, MaxCount>::StartAllExceptSelected(const std::v
 			/// If it's not in the selected threads to not start
 			if(std::find(selectedEnums.begin(), selectedEnums.end(), threadMap.first) == selectedEnums.end()) {
 				/// Start Thread
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllExceptSelected() - Starting: %s", enumToString(threadMap.first));
 				bool started = threadMap.second->Start();
 				allExceptSelectedStarted = allExceptSelectedStarted && started;
 				threadsStartedTracker[threadMap.first] = started;
 			} else {
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllExceptSelected() - Not Starting (Selected): %s", enumToString(threadMap.first));
 			}
 		}
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StartAllExceptSelected() - All except selected starts commanded, NOT indicated to wait to verify if they all started.");
 
 		return allExceptSelectedStarted;
 	}
@@ -279,14 +263,11 @@ bool BaseThreadsManager<EnumType, MaxCount>::StartAllAndWaitToVerify(uint32_t wa
 	{
 		MutexGuard guard(mutex);
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StartAllAndWaitToVerify() - BaseThreads have been requested to start.");
 
 		for(auto& threadMap : threadsManaged) {
-			ConsolePort::WriteConditional(verbose, "Starting: %s", enumToString(threadMap.first));
 			threadMap.second->Start();
 		}
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StartAllAndWaitToVerify() - All starts commanded, waiting to verify all started within %u.", waitToVerifyTimeoutMsec);
 
 		/// Function that will test if the thread has been started
 		std::function<bool()> CheckIfAllHalSubThreadsAreStarted = [this]() {
@@ -304,20 +285,14 @@ bool BaseThreadsManager<EnumType, MaxCount>::StartAllAndWaitToVerify(uint32_t wa
 		const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
 
 		/// Print info to user.
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllAndWaitToVerify() - //============================================//");
 
 		if (result) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllAndWaitToVerify() - BaseThreads Manager SUCCEEDED to start all subthreads within Timeout: [%u] Msec.", elapsedStartTimeMsec);
 		}
 		else {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllAndWaitToVerify() - BaseThreads Manager !!!!! FAILED !!!!! to start all subthreads within Timeout: [%u] Msec.",  waitToVerifyTimeoutMsec);
 		}
 
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllAndWaitToVerify() - //============================================//");
 		for(auto& threadMap : threadsManaged) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllAndWaitToVerify() - Subthread - %s - %s STARTED.", enumToString(threadMap.first), (threadsStartedTracker[threadMap.first] ? "":"NOT"));
 		}
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllAndWaitToVerify() - //============================================//");
 
 		return result; /// Return result
 	}
@@ -333,18 +308,15 @@ bool BaseThreadsManager<EnumType, MaxCount>::StartSelectedAndWaitToVerify(const 
 		MutexGuard guard(mutex);
 
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StartSelectedAndWaitToVerify() - Selected BaseThreads have been requested to start.");
 
 		for(const auto& enumValue : selectedEnums) {
 			auto threadMap = threadsManaged.find(enumValue);
 			if(threadMap != threadsManaged.end()) {
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartSelectedAndWaitToVerify() - Starting: %s", enumToString(threadMap->first));
 				threadMap->second->Start();
 			}
 		}
 
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StartSelectedAndWaitToVerify() - All starts commanded, waiting to verify all started within %u.", waitToVerifyTimeoutMsec);
 
 		/// Function that will test if the specified threads has been started
 		std::function<bool()> CheckIfAllSelectedThreadsAreStarted = [this, selectedEnums] {
@@ -369,20 +341,14 @@ bool BaseThreadsManager<EnumType, MaxCount>::StartSelectedAndWaitToVerify(const 
 		const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
 
 		/// Print info to user.
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartSelectedAndWaitToVerify() - //============================================//");
 
 		if (result) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartSelectedAndWaitToVerify() - BaseThreads Manager SUCCEEDED to start all selected subthreads within Timeout: [%u] Msec.", elapsedStartTimeMsec);
 		}
 		else {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartSelectedAndWaitToVerify() - BaseThreads Manager !!!!! FAILED !!!!! to start all selected subthreads within Timeout: [%u] Msec.",  waitToVerifyTimeoutMsec);
 		}
 
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartSelectedAndWaitToVerify() - //============================================//");
 		for(const auto& enumValue : selectedEnums) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartSelectedAndWaitToVerify() - Subthread - %s - %s STARTED.", enumToString(enumValue), (threadsStartedTracker[enumValue] ? "":"NOT"));
 		}
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartSelectedAndWaitToVerify() - //============================================//");
 
 		return result; /// Return result
 	}
@@ -398,19 +364,16 @@ bool BaseThreadsManager<EnumType, MaxCount>::StartAllExceptSelectedAndWaitToVeri
 		MutexGuard guard(mutex);
 
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StartAllExceptSelectedAndWaitToVerify() - All BaseThreads except selected have been requested to start.");
 
 		/// For all threads managed
 		for(const auto& threadMap : threadsManaged) {
 			/// If they're not in the selected threads list indicated not to start
 			if(std::find(selectedEnums.begin(), selectedEnums.end(), threadMap.first) == selectedEnums.end()) {
 				/// Start threads
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllExceptSelectedAndWaitToVerify() - Starting: %s", enumToString(threadMap.first));
 				threadMap.second->Start();
 			}
 		}
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StartAllExceptSelectedAndWaitToVerify() - All except selected starts commanded, waiting to verify all started within %u.", waitToVerifyTimeoutMsec);
 
 		/// Function that will test if the specified threads has been started
 		std::function<bool()> CheckIfAllExceptSelectedThreadsAreStarted = [this, selectedEnums] {
@@ -439,22 +402,16 @@ bool BaseThreadsManager<EnumType, MaxCount>::StartAllExceptSelectedAndWaitToVeri
 		const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
 
 		/// Print info to user.
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllExceptSelectedAndWaitToVerify() - //============================================//");
 
 		if (result) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllExceptSelectedAndWaitToVerify() - BaseThreads Manager SUCCEEDED to start all except selected subthreads within Timeout: [%u] Msec.", elapsedStartTimeMsec);
 		}
 		else {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllExceptSelectedAndWaitToVerify() - BaseThreads Manager !!!!! FAILED !!!!! to start all except selected subthreads within Timeout: [%u] Msec.",  waitToVerifyTimeoutMsec);
 		}
 
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllExceptSelectedAndWaitToVerify() - //============================================//");
 		for(const auto& threadMap : threadsManaged) {
 			if(std::find(selectedEnums.begin(), selectedEnums.end(), threadMap.first) == selectedEnums.end()) {
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllExceptSelectedAndWaitToVerify() - Subthread - %s - %s STARTED.", enumToString(threadMap.first), (threadsStartedTracker[threadMap.first] ? "":"NOT"));
 			}
 		}
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StartAllExceptSelectedAndWaitToVerify() - //============================================//");
 
 		return result; /// Return result
 	}
@@ -470,14 +427,11 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopAll() noexcept
 		MutexGuard guard(mutex);
 
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StopAll() - BaseThreads have been requested to stop.");
 
 		for(auto& threadMap : threadsManaged) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAll() - Stopping: %s", enumToString(threadMap.first));
 			threadsStoppedTracker[threadMap.first] = threadMap.second->Stop();
 		}
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StopAll() - All stops commanded, NOT indicated to wait in order to verify if they all stopped.");
 
 		return threadsStoppedTracker.all();
 	}
@@ -492,20 +446,17 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopSelected(const std::vector<Enum
 		MutexGuard guard(mutex);
 
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StopSelected() - Selected BaseThreads have been requested to stop.");
 
 		bool allSelectedStopped = true;
 		for(const auto& enumValue : selectedEnums) {
 			auto threadMap = threadsManaged.find(enumValue);
 			if(threadMap != threadsManaged.end()) {
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopSelected() - Stopping: %s", enumToString(threadMap->first));
 				bool stopped = threadMap->second->Stop();
 				allSelectedStopped = allSelectedStopped && stopped;
 				threadsStoppedTracker[threadMap->first] = stopped;
 			}
 		}
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StopSelected() - All selected stops commanded, NOT indicated to wait in order to verify if they all stopped.");
 
 		return allSelectedStopped;
 	}
@@ -521,21 +472,17 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopAllExceptSelected(const std::ve
 		MutexGuard guard(mutex);
 
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StopAllExceptSelected() - All BaseThreads except selected have been requested to stop.");
 
 		bool allExceptSelectedStopped = true;
 		for(const auto& threadMap : threadsManaged) {
 			if(std::find(selectedEnums.begin(), selectedEnums.end(), threadMap.first) == selectedEnums.end()) {
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllExceptSelected() - Stopping: %s", enumToString(threadMap.first));
 				bool stopped = threadMap.second->Stop();
 				allExceptSelectedStopped = allExceptSelectedStopped && stopped;
 				threadsStoppedTracker[threadMap.first] = stopped;
 			} else {
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllExceptSelected() - Not Stopping (Selected): %s", enumToString(threadMap.first));
 			}
 		}
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StopAllExceptSelected() - All except selected stops commanded, NOT indicated to wait in order to verify if they all stopped.");
 
 		return allExceptSelectedStopped;
 	}
@@ -549,14 +496,11 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopAllAndWaitToVerify(uint32_t wai
 	{
 		MutexGuard guard(mutex);
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StopAllAndWaitToVerify() - BaseThreads has been requested to stop.");
 
 		for(auto& threadMap : threadsManaged) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllAndWaitToVerify() - Stopping: %s", enumToString(threadMap.first));
 			threadsStoppedTracker[threadMap.first] = threadMap.second->Stop();
 		}
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StopAllAndWaitToVerify() - All stops commanded, waiting to verify all stopped within %u.", waitToVerifyTimeoutMsec);
 
 		/// Function that will test if the thread has been started
 		std::function<bool()> CheckIfAllHalSubThreadsAreStopped = [this]() {
@@ -576,21 +520,14 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopAllAndWaitToVerify(uint32_t wai
 		const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
 
 		/// Print info to user.
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllAndWaitToVerify() - //============================================//");
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllAndWaitToVerify() - //============================================//");
 
 		if (result) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllAndWaitToVerify() - BaseThreads Manager SUCCEEDED to stop all subthreads within Timeout: [%u] Msec.", elapsedStartTimeMsec);
 		}
 		else {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllAndWaitToVerify() - BaseThreads Manager !!!!! FAILED !!!!! to stop all subthreads within Timeout: [%u] Msec.",  waitToVerifyTimeoutMsec);
 		}
 
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllAndWaitToVerify() - //============================================//");
 		for(auto& threadMap : threadsManaged) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllAndWaitToVerify() - Subthread - %s - %s STOPPED.", enumToString(threadMap.first), (threadsStoppedTracker[threadMap.first] ? "":"NOT"));
 		}
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllAndWaitToVerify() - //============================================//");
 
 		return result; /// Return result
 	}
@@ -606,17 +543,14 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopSelectedAndWaitToVerify(const s
 		MutexGuard guard(mutex);
 ;
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StopSelectedAndWaitToVerify() - Selected BaseThreads have been requested to stop.");
 
 		for(const auto& enumValue : selectedEnums) {
 			auto threadMap = threadsManaged.find(enumValue);
 			if(threadMap != threadsManaged.end()) {
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopSelectedAndWaitToVerify() - Stopping: %s", enumToString(threadMap->first));
 				threadsStoppedTracker[threadMap->first] = threadMap->second->Stop();
 			}
 		}
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StopSelectedAndWaitToVerify() - All stops commanded, waiting to verify all stopped within %u.", waitToVerifyTimeoutMsec);
 
 		/// Function that will test if the specified threads has been stopped
 		std::function<bool()> CheckIfAllSelectedThreadsAreStopped = [this, selectedEnums] {
@@ -639,20 +573,14 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopSelectedAndWaitToVerify(const s
 		const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
 
 		/// Print info to user.
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopSelectedAndWaitToVerify() - //============================================//");
 
 		if (result) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopSelectedAndWaitToVerify() - BaseThreads Manager SUCCEEDED to stop all selected subthreads within Timeout: [%u] Msec.", elapsedStartTimeMsec);
 		}
 		else {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopSelectedAndWaitToVerify() - BaseThreads Manager !!!!! FAILED !!!!! to stop all selected subthreads within Timeout: [%u] Msec.",  waitToVerifyTimeoutMsec);
 		}
 
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopSelectedAndWaitToVerify() - //============================================//");
 		for(const auto& enumValue : selectedEnums) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopSelectedAndWaitToVerify() - Subthread - %s - %s STOPPED.", enumToString(enumValue), (threadsStoppedTracker[enumValue] ? "":"NOT"));
 		}
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopSelectedAndWaitToVerify() - //============================================//");
 
 		return result; /// Return result
 	}
@@ -668,21 +596,17 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopAllExceptSelectedAndWaitToVerif
 	{
 		MutexGuard guard(mutex);
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StopAllExceptSelectedAndWaitToVerify() - All BaseThreads except selected have been requested to stop.");
 
 		/// For all threads managed
 		for(const auto& threadMap : threadsManaged) {
 			/// If they're not in the selected threads list indicated not to start
 			if(std::find(selectedEnums.begin(), selectedEnums.end(), threadMap.first) == selectedEnums.end()) {
 				/// Start threads
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllExceptSelectedAndWaitToVerify() - Stopping: %s", enumToString(threadMap.first));
 				threadMap.second->Stop();
 			} else {
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllExceptSelectedAndWaitToVerify() - Not Stopping (Selected): %s", enumToString(threadMap.first));
 			}
 		}
 
-		ConsolePort::WriteConditional(verbose,"BaseThreadsManager::StopAllExceptSelectedAndWaitToVerify() - All except selected stop commanded, waiting to verify all stopped within %u.", waitToVerifyTimeoutMsec);
 
 		/// Function that will test if the specified threads has been stopped
 		std::function<bool()> CheckIfAllExceptSelectedThreadsAreStopped = [this, selectedEnums] {
@@ -711,22 +635,16 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopAllExceptSelectedAndWaitToVerif
 		const uint32_t elapsedStopTimeMsec = os_get_elapsed_time_msec() - waitStopTimeMsec;
 
 		/// Print info to user.
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllExceptSelectedAndWaitToVerify() - //============================================//");
 
 		if (result) {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllExceptSelectedAndWaitToVerify() - BaseThreads Manager SUCCEEDED to stop all except selected subthreads within Timeout: [%u] Msec.", elapsedStopTimeMsec);
 		}
 		else {
-			ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllExceptSelectedAndWaitToVerify() - BaseThreads Manager !!!!! FAILED !!!!! to stop all except selected subthreads within Timeout: [%u] Msec.",  waitToVerifyTimeoutMsec);
 		}
 
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllExceptSelectedAndWaitToVerify() - //============================================//");
 		for(const auto& threadMap : threadsManaged) {
 			if(std::find(selectedEnums.begin(), selectedEnums.end(), threadMap.first) == selectedEnums.end()) {
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllExceptSelectedAndWaitToVerify() - Subthread - %s - %s STOPPED.", enumToString(threadMap.first), (threadsStoppedTracker[threadMap.first] ? "":"NOT"));
 			}
 		}
-		ConsolePort::WriteConditional(verbose, "BaseThreadsManager::StopAllExceptSelectedAndWaitToVerify() - //============================================//");
 
 		return result; /// Return result
 	}
@@ -765,11 +683,8 @@ bool BaseThreadsManager<EnumType, MaxCount>::Initialize() noexcept
 			threadsInitializedTracker[threadMap.first] = threadInitialized;
 
 			if(threadInitialized) {
-				ConsolePort::WriteConditional(verbose, "BaseThreadsManager::Initialize() - Initialized: %s", enumToString(threadMap.first));
 			}
 			else {
-			//	ConsolePort::WriteConditional(verbose, "BaseThreadsManager::Initialize() - Failed to initialize: %s", enumToString(threadMap.first));
-				ConsolePort::Write("BaseThreadsManager::Initialize() - Failed to initialize: %s", enumToString(threadMap.first));
 				os_delay_msec( 5 );
 			}
 		}

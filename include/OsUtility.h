@@ -17,7 +17,13 @@
 
 #define UTIL_SYSTEM_CLOCK (240000000.0)	//240MHz
 
+#if defined(HF_RTOS_FREERTOS)
 static constexpr uint32_t osTickRateHz = configTICK_RATE_HZ; // 1000 ticks per second
+#else
+static constexpr uint32_t osTickRateHz = 1000; // Default 1 kHz assumed
+#endif
+
+#if defined(HF_RTOS_FREERTOS)
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,8 +47,38 @@ uint32_t os_get_elapsed_time_msec();
 }
 #endif
 
+#endif /* HF_RTOS_FREERTOS */
+
 // Include after function declarations to avoid circular dependency
 #include "Utility.h"
+
+// ── Portable constexpr conversion utilities (work regardless of RTOS) ────
+/**
+ * @brief Converts milliseconds to delay ticks.
+ */
+constexpr uint32_t os_convert_msec_to_delay_ticks( uint32_t milliseconds )
+{
+	return milliseconds * osTickRateHz / 1000U;
+}
+
+/**
+ * @brief Converts delay ticks to milliseconds.
+ */
+constexpr uint32_t os_convert_delay_ticks_to_msec(uint32_t delayTicks)
+{
+    return (delayTicks * 1000U) / osTickRateHz;
+}
+
+/**
+ * @brief Converts frequency to delay ticks.
+ */
+constexpr uint32_t os_convert_hz_to_delay_ticks( uint32_t frequency )
+{
+	return osTickRateHz/frequency;
+}
+
+// ── FreeRTOS-specific declarations (implemented in OsUtility.cpp) ────────
+#if defined(HF_RTOS_FREERTOS)
 
 #ifdef __cplusplus
 extern "C" {
@@ -89,43 +125,6 @@ uint32_t os_get_elapsed_processor_cycle_count(uint32_t startCycleCount, time_uni
  * @return	Processor's current cycle count (DWT->CYCCNT)
  */
 uint32_t os_get_processor_cycle_count();
-
-/**
- * @brief Converts milliseconds to delay ticks.
- *
- * @param milliseconds The duration in milliseconds.
- * @return The corresponding delay ticks.
- */
-constexpr uint32_t os_convert_msec_to_delay_ticks( uint32_t milliseconds )
-{
-	//Calculate the delay in terms of the threadx tick rate */
-	return milliseconds * osTickRateHz / 1000U;
-}
-
-
-/**
- * @brief Converts delay ticks to milliseconds.
- *
- * @param delayTicks The duration in delay ticks.
- * @return The corresponding milliseconds.
- */
-constexpr uint32_t os_convert_delay_ticks_to_msec(uint32_t delayTicks)
-{
-    // Calculate the delay in terms of milliseconds
-    return (delayTicks * 1000U) / osTickRateHz;
-}
-
-/**
- * @brief Converts frequency to delay ticks.
- *
- * @param frequency The frequency value.
- * @return The corresponding delay ticks.
- */
-constexpr uint32_t os_convert_hz_to_delay_ticks( uint32_t frequency )
-{
-	// Calculate the delay in terms of the threadx tick rate
-	return osTickRateHz/frequency;
-}
 
 /**
  * @brief Handler for stack faults in threads.
@@ -446,5 +445,74 @@ bool os_event_flags_get_ex(OS_EventGroup& eventFlags, OS_Ulong flagsToGet,
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* HF_RTOS_FREERTOS — end of FreeRTOS-specific declarations */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * RTOS_NONE  — inline no-op stubs for _ex functions (OsUtility.cpp not compiled)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+#if defined(HF_RTOS_NONE) || defined(HF_MCU_FAMILY_NONE)
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+static inline void os_delay_msec(uint16_t msec) { (void)msec; }
+static inline void os_delay_time(uint32_t t, time_unit_t u) { (void)t; (void)u; }
+static inline uint32_t os_get_elapsed_time_msec() { return 0; }
+static inline uint32_t os_get_elapsed_processor_cycle_count(uint32_t s, time_unit_t u) { (void)s; (void)u; return 0; }
+static inline uint32_t os_get_processor_cycle_count() { return 0; }
+static inline void os_stack_fault_handler(OS_Thread* t) { (void)t; }
+
+#ifdef __cplusplus
+}
+#endif
+
+// Mutex _ex stubs
+static inline bool os_mutex_create_ex(OS_Mutex&, const char*, OS_Uint = 0, bool = true) noexcept { return true; }
+static inline bool os_mutex_get_ex(OS_Mutex&, OS_Ulong, bool = true) noexcept { return true; }
+static inline bool os_mutex_put_ex(OS_Mutex&, bool = true) noexcept { return true; }
+static inline bool os_mutex_delete_ex(OS_Mutex&, bool = true) noexcept { return true; }
+static inline bool os_mutex_create_p(OS_Mutex*, const char*, OS_Uint = 0, bool = true) noexcept { return true; }
+static inline bool os_mutex_get_p(OS_Mutex*, OS_Ulong, bool = true) noexcept { return true; }
+static inline bool os_mutex_put_p(OS_Mutex*, bool = true) noexcept { return true; }
+static inline bool os_mutex_delete_p(OS_Mutex*, bool = true) noexcept { return true; }
+
+// Thread _ex stubs
+static inline bool os_thread_create_ex(OS_Thread*, const char*, void (*)(OS_Ulong), OS_Ulong,
+                                       uint8_t*, OS_Ulong, OS_Uint, OS_Uint, OS_Ulong,
+                                       OS_Uint, bool = true) noexcept { return true; }
+static inline bool os_thread_resume_ex(OS_Thread*, bool = true) { return true; }
+static inline bool os_thread_resume_if_suspended(OS_Thread*, bool = true) noexcept { return true; }
+static inline bool os_thread_suspend_ex(OS_Thread*, bool = true) { return true; }
+static inline bool os_thread_delete_ex(OS_Thread*, bool = true) noexcept { return true; }
+
+// Queue _ex stubs
+static inline bool os_queue_create_ex(OS_Queue&, const char*, OS_Uint, void*, OS_Ulong, bool = true) noexcept { return true; }
+static inline bool os_queue_delete_ex(OS_Queue&, bool = true) noexcept { return true; }
+static inline bool os_queue_send_ex(OS_Queue&, void*, OS_Ulong = 0xFFFFFFFFUL, bool = true) noexcept { return true; }
+static inline bool os_queue_receive_ex(OS_Queue&, void*, OS_Ulong = 0xFFFFFFFFUL, bool = true) noexcept { return false; }
+
+// Timer _ex stubs
+static inline bool os_timer_create_ex(OS_Timer&, const char*, void (*)(uint32_t), uint32_t, uint32_t, uint32_t, OS_Uint, bool = true) noexcept { return true; }
+static inline bool os_timer_deactivate_and_delete_ex(OS_Timer&, bool = true) noexcept { return true; }
+static inline bool os_timer_activate_ex(OS_Timer&, bool = true) noexcept { return true; }
+static inline bool os_timer_deactivate_ex(OS_Timer&, bool = true) noexcept { return true; }
+
+// Semaphore _ex stubs
+static inline bool os_semaphore_create_ex(OS_Semaphore*, const char*, OS_Uint, bool = true) noexcept { return true; }
+static inline bool os_semaphore_delete_ex(OS_Semaphore*, bool = true) noexcept { return true; }
+static inline bool os_semaphore_put_ex(OS_Semaphore*, bool = true) noexcept { return true; }
+static inline bool os_semaphore_get_ex(OS_Semaphore*, OS_Ulong, bool = true) noexcept { return true; }
+static inline OS_Ulong os_semaphore_get_count_ex(OS_Semaphore*, bool = true) noexcept { return 0; }
+
+// Event flags _ex stubs
+static inline bool os_event_flags_create_ex(OS_EventGroup&, const char*, bool = true) noexcept { return true; }
+static inline bool os_event_flags_delete_ex(OS_EventGroup&, bool = true) noexcept { return true; }
+static inline bool os_event_flags_set_ex(OS_EventGroup&, OS_Ulong, bool = true) noexcept { return true; }
+static inline bool os_event_flags_clear_ex(OS_EventGroup&, OS_Ulong, bool = true) noexcept { return true; }
+static inline bool os_event_flags_get_ex(OS_EventGroup&, OS_Ulong, OS_Uint, OS_Ulong&, OS_Ulong, bool = true) noexcept { return true; }
+
+#endif /* HF_RTOS_NONE / HF_MCU_FAMILY_NONE */
 
 #endif // OS_UTILITY_H_

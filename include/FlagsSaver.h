@@ -14,8 +14,6 @@
 #include <functional>
 #include "UTILITIES/common/RtosCompat.h"
 
-#include <HAL/component_handlers/ConsolePort.h>
-
 #include "UTILITIES/common/FlagsSaverGettersExposer.h"
 #include "UTILITIES/common/FlagsSaverSettersExposer.h"
 #include <UTILITIES/common/EnumeratedSetStatus.h>
@@ -530,13 +528,8 @@ bool FlagsSaver<FlagsType,N>::ClearNewDataEvent() noexcept {
 template <typename FlagsType, size_t N>
 void FlagsSaver<FlagsType,N>::PrintFlags( FlagsType flag) noexcept
 {
-	if( verbose )
-	{
-		FlagsStatus status = flagsStatus.Get( flag );
-		ConsolePort::Write( "FlagsSaver::PrintFlags() - Entry %s(%d) set to %s(%d).",
-		  flagsStatus.ToEnumerationString(flag), std::to_underlying(flag), flagsStatus.ToStatusString(status), std::to_underlying(status) );
-		TxDelayMsec ( 2 );
-	}
+	// ConsolePort logging removed
+	(void)flag;
 }
 
 #endif /* UTILITIES_COMMON_FLAGSSAVER_H_ */

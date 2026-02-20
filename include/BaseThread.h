@@ -21,7 +21,6 @@
 #include <memory>
 #include <atomic>
 #include "OsAbstraction.h"
-#include "ConsolePort.h"
 #include "OsUtility.h"
 #include "SignalSemaphore.h"
 
@@ -338,8 +337,6 @@ protected:
     bool osThreadCreated;
     SignalSemaphore signalSemaphore;
     static constexpr char baseThreadStartSemaphoreBaseName[] = "BaseThreadStartSem-";
-
-    ConsolePort &consolePort;
 
 private:
 

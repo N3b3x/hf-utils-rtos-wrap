@@ -14,8 +14,6 @@
 #include <functional>
 #include "UTILITIES/common/RtosCompat.h"
 
-#include <HAL/component_handlers/ConsolePort.h>
-
 #include <UTILITIES/common/ThingsToString.h>
 #include <UTILITIES/common/EnumeratedSetStatus.h>
 #include <UTILITIES/common/ErrorSaverGettersExposer.h>
@@ -548,46 +546,14 @@ bool ErrorSaver<ErrorType,N>::ClearNewDataEvent() noexcept {
 template <typename ErrorType, size_t N>
 void ErrorSaver<ErrorType,N>::PrintError( ErrorType error) noexcept
 {
-	if( verbose )
-	{
-		ErrorStatus status = errorStatus.Get( error );
-		ConsolePort::Write( "ErrorSaver::PrintError() - Entry %s(%d) set to %s(%d).",
-		  errorStatus.ToEnumerationString(error), std::to_underlying(error), errorStatus.ToStatusString(status), std::to_underlying(status) );
-		TxDelayMsec ( 2 );
-	}
+	// ConsolePort logging removed
+	(void)error;
 }
 
 template <typename ErrorType, size_t N>
 void ErrorSaver<ErrorType, N>::PrintAllErrors(const char* reason) noexcept {
-    if (EnsureInitialized()) {
-		MutexGuard guard(mutex);
-
-		ConsolePort::GetInstance().NewLine();
-		ConsolePort::GetInstance().Write( "==||=======================================================||==");
-		ConsolePort::GetInstance().Write( "==||***  ErrorSaver DATA: ErrorSaver::PrintAllErrors()  ***||==");
-		ConsolePort::GetInstance().Write( "==||=======================================================||==");
-		ConsolePort::GetInstance().Write( "ErrorSaver::PrintAllErrors() - %s", reason );
-
-        for (size_t i = 0; i < N; ++i) {
-            ErrorType error = static_cast<ErrorType>(i);
-            ErrorStatus status = errorStatus.Get(error);
-
-            // Print the error only if it is not in the Unknown state
-            if (/*status != ErrorStatus::Unknown*/ true) {
-                ConsolePort::Write(
-                	"	- Error: %-55s (%2d) - Status: %-10s (%d)",
-                    errorStatus.ToEnumerationString(error),
-                    static_cast<int>(error),
-                    errorStatus.ToStatusString(status),
-                    static_cast<int>(status)
-                );
-            }
-        }
-
-		ConsolePort::GetInstance().Write( "==||=======================================================||==");
-		ConsolePort::GetInstance().NewLine();
-
-    }
+    // ConsolePort logging removed
+    (void)reason;
 }
 
 #endif /* UTILITIES_COMMON_ERRORSAVER_H_ */

@@ -16,7 +16,6 @@
 #include "BaseThread.h"
 #include "OsUtility.h"
 #include "Utility.h"
-#include "ConsolePort.h"
 
 //==============================================================//
 /// VERBOSE??
@@ -45,8 +44,6 @@ BaseThread::BaseThread( const char* threadName) :
 	osThreadCreated( false),
 	signalSemaphore( baseThreadStartSemaphoreBaseName, threadName),
 
-    consolePort(ConsolePort::GetInstance()),
-
 	waitBeforeStep(0),
 	minTimestampBeforeNextStep(0),
 	threadRunning(false),
@@ -67,8 +64,6 @@ BaseThread::~BaseThread()
 {
 	if( osThreadCreated )
 	{
-		ConsolePort::WriteConditional(verbose,"BaseThread::~BaseThread()",  "- Deleting %s.", osThreadName);
-
 		os_thread_delete_ex( &osThread);
 	}
 }
@@ -112,12 +107,10 @@ bool BaseThread::CreateBaseThread( uint8_t* stack, OS_Ulong stackSizeBytes,
 		   /// Mark the base thread as created.
 		   osThreadCreated = true;
 
-		   ConsolePort::WriteConditional(verbose,"BaseThread::CreateBaseThread() - Successfully created %s.", osThreadName);
 		return true;
 	   }
 	   else
 	   {
-		   ConsolePort::WriteConditional(true,"BaseThread::CreateBaseThread() - Failed to create %s.", osThreadName);
 		   os_delay_msec( 5 );
 		   return false;
 	   }
@@ -182,24 +175,14 @@ bool BaseThread::IsSuspended() noexcept
 
 bool BaseThread::Start() noexcept
 {
-	ConsolePort::WriteConditional(verbose, "BaseThread::Start() - invoked on thread: %s.", osThreadName);
-
 	if(IsThreadRunning()) {
-		ConsolePort::WriteConditional(verbose, "BaseThread::Start() - thread: %s - already running.", osThreadName);
 		return true;
 	}
 
-	ConsolePort::WriteConditional(verbose, "BaseThread::Start() - thread: %s - running StartAction().", osThreadName);
-
 	/// Run start action
 	if(StartAction()) {
-		ConsolePort::WriteConditional(verbose, "BaseThread::Start() - thread: %s - StartAction() successful, signaling start.", osThreadName);
-
 	    /// If successful, signal the thread via the designated semaphore to start the process
 	    return signalSemaphore.Signal();
-	}
-	else {
-		ConsolePort::WriteConditional(verbose, "BaseThread::Start() - thread: %s - StartAction() FAILED, CANNOT SIGNAL START.", osThreadName);
 	}
 
 	/// Otherwise, indicate that we cannot start thread.
@@ -226,8 +209,6 @@ void BaseThread::ThreadEntry( OS_Ulong threadEntry)
 {
     BaseThread* thread = reinterpret_cast<BaseThread*>(threadEntry);
 
-    ConsolePort::WriteConditional( verbose,  "BaseThread::ThreadEntry() for %s.",  thread->osThreadName );
-
     while ( true )
     {
         thread->ClearThreadRunning();   /// Clear the thread running flag so that we can Start() properly.
@@ -242,9 +223,6 @@ void BaseThread::ThreadEntry( OS_Ulong threadEntry)
                                                  and then sent another STOP flag because CALLER doesn't see the mode starting, this should not be the case
                                                  in the final product but necessary during development. */
         thread->ClearCleanupComplete();		/**< Clear the cleanup complete flag. */
-
-        ConsolePort::WriteConditional( verbose,  "%s() - Start initiated on semaphore: %s.",
-                 thread->osThreadName, thread->signalSemaphore.GetName());
 
         if( !thread->IsSetupComplete() )
         {
@@ -261,10 +239,6 @@ void BaseThread::ThreadEntry( OS_Ulong threadEntry)
 			os_delay_msec(static_cast<uint16_t>(thread->waitBeforeStep));	/// Delay requested time
 			thread->ClearThreadStepInDelay();							/// Clear that we are in a delay
         }
-
-        ConsolePort::WriteConditional( verbose,  "%s() - Stop initiated on semaphore: %s.",
-           thread->osThreadName, thread->signalSemaphore.GetName());
-
 
         /// Make sure to mark
         if( !thread->IsCleanupComplete() )
@@ -284,40 +258,19 @@ void BaseThread::ThreadEntry( OS_Ulong threadEntry)
  */
 void BaseThread::WaitForStart() noexcept
 {
-     ConsolePort::WriteConditional( verbose,  "%s() - Waiting indefinitely for start on semaphore: %s.",
-         osThreadName, signalSemaphore.GetName());
-
      signalSemaphore.WaitUntilSignalled();
-
-     ConsolePort::WriteConditional( verbose,  "%s() - received start on semaphore: %s.",
-             osThreadName, signalSemaphore.GetName());
 }
 
 bool BaseThread::StartThreadAndWaitToVerify(uint32_t startTimeoutMsec) {
     /// Start the thread
     if (Start()) {
-       ConsolePort::WriteConditional(verbose,"BaseThread::StartThreadAndWaitToVerify() - Thread [%s] has been requested to start.", osThreadName);
-
         /// Function that will test if the thread has been started
         std::function<bool()> CheckIfThreadIsStarted = [this]() {
             return IsThreadRunning();
         };
 
-        const uint32_t waitStartTimeMsec = os_get_elapsed_time_msec();
-
         /// Expecting true within the timeout specified
         bool result = TestLogicWithTimeout(CheckIfThreadIsStarted, true, startTimeoutMsec, 10);
-
-        const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
-
-
-        /// Print info to user and do other things if necessary.
-        if (result) {
-            ConsolePort::WriteConditional(verbose, "BaseThread::StartThreadAndWaitToVerify() - Thread [%s] has started after %u msec.", osThreadName, elapsedStartTimeMsec);
-        }
-        else {
-            ConsolePort::WriteConditional(verbose, "BaseThread::StartThreadAndWaitToVerify() - Thread [%s] has NOT started within [%u] Msec!!!!!.", osThreadName, startTimeoutMsec);
-        }
 
         return result; /// Return result
     }
@@ -329,28 +282,13 @@ bool BaseThread::StopThreadAndWaitToVerify(uint32_t stopTimeoutMsec) {
     /// Stop the thread
     if (Stop())
     {
-        ConsolePort::WriteConditional(verbose, "BaseThread::StopThreadAndWaitToVerify() - Thread [%s] has been requested to stop.", osThreadName);
-
         /// Function that will test if the thread has been stopped
         std::function<bool()> CheckIfThreadIsStopped = [this]() {
             return IsThreadStopped();
         };
 
-        const uint32_t waitStartTimeMsec = os_get_elapsed_time_msec();
-
         /// Expecting true within the timeout specified
         bool result = TestLogicWithTimeout(CheckIfThreadIsStopped, true, stopTimeoutMsec, 10);
-
-
-        const uint32_t elapsedStopTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
-
-        /// Print info to user and do other things if necessary.
-        if (result) {
-        	ConsolePort::WriteConditional(verbose, "BaseThread::StopThreadAndWaitToVerify() - Thread [%s] has stopped after %u msec", osThreadName, elapsedStopTimeMsec );
-        }
-        else {
-        	ConsolePort::WriteConditional(verbose, "BaseThread::StopThreadAndWaitToVerify() - Thread [%s] has NOT stopped within [%u] Msec!!!!!.", osThreadName, stopTimeoutMsec);
-        }
 
         return result; /// Return result
     }

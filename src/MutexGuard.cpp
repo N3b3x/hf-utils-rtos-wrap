@@ -24,7 +24,6 @@
  */
 
 #include "OsAbstraction.h"
-#include "ConsolePort.h"
 #include "MutexGuard.h"
 #include "OsUtility.h"
 
@@ -43,18 +42,6 @@ MutexGuard::MutexGuard(OS_Mutex* mutexArg, bool* pSuccess) :
 	uint32_t maxMsecToWait = MaxWaitTimeMsec;
 
 	bool result = os_mutex_get_p(mutexArg, os_convert_msec_to_delay_ticks(maxMsecToWait), !verbose);  // tx_mutex_get checks for bad params
-	if( !result )
-	{
-		if( mutexArg)
-		{
-			ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %lu msec", maxMsecToWait );
-		}
-		else
-		{
-			ConsolePort::WriteConditional(verbose, "MutexGuard", "%s", " Invalid mutex." );
-		}
-	}
-
 	/// Return true in pointer if successful.
 	if(pSuccess!=nullptr) { *pSuccess = (result); }
 }
@@ -72,14 +59,6 @@ MutexGuard::MutexGuard(OS_Mutex& mutexArg, bool* pSuccess) :
 	uint32_t maxMsecToWait = MaxWaitTimeMsec;
 
         OS_Uint result = os_mutex_get_ex(mutexArg, os_convert_msec_to_delay_ticks(maxMsecToWait), !verbose);
-	if( !result )
-	{
-		ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %lu msec", maxMsecToWait );
-	}
-	else
-	{
-		ConsolePort::WriteConditional(verbose, "MutexGuard", " Successfully locked mutex after %lu msec", maxMsecToWait );
-	}
 
 	/// Return true in pointer if successful.
 	if(pSuccess!=nullptr) { *pSuccess = (result); }
@@ -108,28 +87,6 @@ MutexGuard::MutexGuard(OS_Mutex* mutexArg, uint32_t maxMsecToWait, bool* pSucces
 	mutex(mutexArg)
 {
         OS_Uint result = os_mutex_get_p(mutexArg, os_convert_msec_to_delay_ticks(maxMsecToWait), !verbose);  // tx_mutex_get checks for bad params
-	if( !result )
-	{
-		if( mutexArg)
-		{
-			if( *mutexArg )
-			{
-				ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %lu msec", maxMsecToWait );
-			}
-			else
-			{
-				ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock un-named mutex, reasons." );
-			}
-		}
-		else
-		{
-			ConsolePort::WriteConditional(verbose, "MutexGuard", " Invalid mutex." );
-		}
-	}
-	else
-	{
-		ConsolePort::WriteConditional(verbose, "MutexGuard", " Successfully locked mutex after %lu msec", maxMsecToWait );
-	}
 
 	/// Return true in pointer if successful.
 	if(pSuccess!=nullptr) { *pSuccess = (result); }
@@ -145,14 +102,6 @@ MutexGuard::MutexGuard(OS_Mutex& mutexArg, uint32_t maxMsecToWait, bool* pSucces
         mutex( &mutexArg)
 {
         OS_Uint result = os_mutex_get_ex(mutexArg, os_convert_msec_to_delay_ticks(maxMsecToWait), !verbose);
-	if( !result )
-	{
-		ConsolePort::WriteConditional(verbose, "MutexGuard", " Failed to lock mutex after %lu msec", maxMsecToWait );
-	}
-	else
-	{
-		ConsolePort::WriteConditional(verbose, "MutexGuard", " Successfully locked mutex after %lu msec", maxMsecToWait );
-	}
 
 	/// Return true in pointer if successful.
 	if(pSuccess!=nullptr) { *pSuccess = (result); }
@@ -175,17 +124,7 @@ struct MutexUnlocker
     void operator()(OS_Mutex* mutexArg)
     {
         OS_Uint result = os_mutex_put(mutexArg);
-		if( result != OS_SUCCESS )
-		{
-			if( mutexArg)
-			{
-				ConsolePort::Write("MutexUnlocker", " Failed to release mutex, reason: %u.", result );
-			}
-			else
-			{
-				ConsolePort::Write("MutexUnlocker", "%s", " Invalid mutex." );
-			}
-		}
+		(void)result; // Result previously used for ConsolePort logging
 	}
 	void operator()(Mutex* mutex) const
 	{

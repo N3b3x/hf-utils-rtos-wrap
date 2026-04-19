@@ -45,6 +45,9 @@ public:
 
     /** Delete the timer. */
     bool Destroy() noexcept {
+        if (!created) {
+            return true;
+        }
         bool res = os_timer_deactivate_and_delete_ex(timer);
         if (res) created = false;
         return res;

@@ -122,8 +122,12 @@ public:
     bool IsThreadCreated() noexcept { return osThreadCreated; }
     bool IsThreadStopRequested() noexcept { return stopThreadRequested; }
     bool IsSetupComplete() const noexcept { return setupComplete; }
-    bool IsThreadRunning() const noexcept { return threadRunning; }
-    bool IsThreadStopped() const noexcept { return !threadRunning; }
+    bool IsThreadRunning() const noexcept {
+        return threadRunning.load(std::memory_order_acquire);
+    }
+    bool IsThreadStopped() const noexcept {
+        return !threadRunning.load(std::memory_order_acquire);
+    }
     bool IsCleanupComplete() const noexcept {return cleanupComplete; }
     bool IsThreadInStepDelay() const noexcept {return threadStepInDelay; }
 
@@ -304,12 +308,12 @@ protected:
     /**
      * @brief Mark the thread as running.
      */
-    void MarkThreadRunning() noexcept { threadRunning = true; }
+    void MarkThreadRunning() noexcept { threadRunning.store(true, std::memory_order_release); }
 
     /**
      * @brief Mark the thread as not running.
      */
-    void ClearThreadRunning() noexcept { threadRunning = false; }
+    void ClearThreadRunning() noexcept { threadRunning.store(false, std::memory_order_release); }
 
     /**
      * @brief Indicate a request to stop the thread.

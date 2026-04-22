@@ -93,14 +93,25 @@ bool BaseThread::CreateBaseThread( uint8_t* stack, OS_Ulong stackSizeBytes,
                                    OS_Uint priority, OS_Uint preempt_threshold,
                                    OS_Ulong timeSliceAllowed, OS_Uint auto_start ) noexcept
 {
-	/// Then, if the thread is not already created, create it
-	if(signalSemaphore.EnsureInitialized())
-	{
-	  /// Create the OS Thread
-           bool status = os_thread_create_ex(&osThread, const_cast<char*>(osThreadName), ThreadEntry,
+    // Forward to the pinned variant with no affinity — preserves existing
+    // ABI for every subclass that doesn't care about core affinity.
+    return CreateBaseThread(stack, stackSizeBytes, priority, preempt_threshold,
+                            timeSliceAllowed, auto_start, /*core_id*/ -1);
+}
+
+bool BaseThread::CreateBaseThread( uint8_t* stack, OS_Ulong stackSizeBytes,
+                                   OS_Uint priority, OS_Uint preempt_threshold,
+                                   OS_Ulong timeSliceAllowed, OS_Uint auto_start,
+                                   int core_id ) noexcept
+{
+    /// Then, if the thread is not already created, create it
+    if(signalSemaphore.EnsureInitialized())
+    {
+      /// Create the OS Thread (pinned to `core_id` if >= 0, no affinity otherwise).
+           bool status = os_thread_create_ex_pinned(&osThread, const_cast<char*>(osThreadName), ThreadEntry,
                                         reinterpret_cast<OS_Ulong>(this), stack,
                                         stackSizeBytes, priority, preempt_threshold,
-                                       timeSliceAllowed, auto_start );
+                                       timeSliceAllowed, auto_start, core_id );
 	   /// If successfully created
 	   if (status)
 	   {

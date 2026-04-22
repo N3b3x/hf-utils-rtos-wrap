@@ -286,6 +286,19 @@ protected:
             OS_Uint preempt_threshold, OS_Ulong timeSliceAllowed, OS_Uint auto_start) noexcept;
 
     /**
+     * @brief Pinned-to-core variant of CreateBaseThread (FreeRTOS / SMP).
+     *
+     * Identical to `CreateBaseThread` but pins the new task to `core_id`.
+     * Pass `core_id < 0` (e.g. -1) for "no affinity" — equivalent to the
+     * non-pinned variant. On single-core builds the affinity is ignored.
+     *
+     * @param core_id  CPU core to pin the task to (0 or 1 on ESP32-S3).
+     */
+    bool CreateBaseThread(uint8_t *stack, OS_Ulong stackSizeBytes, OS_Uint priority,
+            OS_Uint preempt_threshold, OS_Ulong timeSliceAllowed, OS_Uint auto_start,
+            int core_id) noexcept;
+
+    /**
      * @brief Mark the setup as complete.
      */
     void MarkSetupComplete() noexcept { setupComplete = true; }

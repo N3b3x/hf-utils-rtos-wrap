@@ -374,6 +374,26 @@ bool os_thread_create_ex(OS_Thread* txThread, const char* name,
     }
 }
 
+bool os_thread_create_ex_pinned(OS_Thread* txThread, const char* name,
+                    void (*entry_function)(OS_Ulong id), OS_Ulong entry_input,
+                    uint8_t* stack, OS_Ulong stackSizeBytes, OS_Uint priority,
+                    OS_Uint preempt_threshold, OS_Ulong timeSliceAllowed,
+                    OS_Uint auto_start, int core_id, bool suppressVerbose ) noexcept
+{
+    OS_Uint err = os_thread_create_pinned(txThread, const_cast<char*>(name),
+                                          entry_function, entry_input, stack,
+                                          stackSizeBytes, priority,
+                                          preempt_threshold, timeSliceAllowed,
+                                          auto_start, core_id);
+    if (err == OS_SUCCESS)
+    {
+        ++g_ssp_common_thread_count;
+        return true;
+    }
+    os_delay_msec( 5 );
+    return false;
+}
+
 /**
  * @brief Function to Delete TX thread.
  * @param txThread Pointer to the OS thread control block to be deleted.

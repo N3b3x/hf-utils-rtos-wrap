@@ -233,6 +233,23 @@ bool os_thread_create_ex(OS_Thread* txThread, const char* name,
                     OS_Uint auto_start, bool suppressVerbose=true) noexcept;
 
 /**
+ * @brief Pinned-to-core variant of os_thread_create_ex (FreeRTOS / SMP).
+ *
+ * Mirrors `os_thread_create_ex` but takes an additional `core_id` that is
+ * forwarded to `os_thread_create_pinned`. Pass `core_id < 0` (e.g. -1) for
+ * "no affinity" — equivalent to the non-pinned variant.
+ *
+ * @param core_id  CPU core to pin the new task to (0 or 1 on ESP32-S3),
+ *                 or any value < 0 for no affinity.
+ */
+bool os_thread_create_ex_pinned(OS_Thread* txThread, const char* name,
+                    void (*entry_function)(OS_Ulong id), OS_Ulong entry_input,
+                    uint8_t* stack, OS_Ulong stackSizeBytes, OS_Uint priority,
+                    OS_Uint preempt_threshold, OS_Ulong timeSliceAllowed,
+                    OS_Uint auto_start, int core_id,
+                    bool suppressVerbose=true) noexcept;
+
+/**
  * @brief Resumes the specified OS thread.
  *
  * @param thread The OS thread to resume.
@@ -482,6 +499,9 @@ static inline bool os_mutex_delete_p(OS_Mutex*, bool = true) noexcept { return t
 static inline bool os_thread_create_ex(OS_Thread*, const char*, void (*)(OS_Ulong), OS_Ulong,
                                        uint8_t*, OS_Ulong, OS_Uint, OS_Uint, OS_Ulong,
                                        OS_Uint, bool = true) noexcept { return true; }
+static inline bool os_thread_create_ex_pinned(OS_Thread*, const char*, void (*)(OS_Ulong), OS_Ulong,
+                                              uint8_t*, OS_Ulong, OS_Uint, OS_Uint, OS_Ulong,
+                                              OS_Uint, int /*core_id*/, bool = true) noexcept { return true; }
 static inline bool os_thread_resume_ex(OS_Thread*, bool = true) { return true; }
 static inline bool os_thread_resume_if_suspended(OS_Thread*, bool = true) noexcept { return true; }
 static inline bool os_thread_suspend_ex(OS_Thread*, bool = true) { return true; }

@@ -87,6 +87,53 @@ static inline OS_Uint os_thread_create(OS_Thread *t, const char *name,
     return OS_SUCCESS;
 }
 
+/**
+ * @brief Pinned-to-core variant of os_thread_create (FreeRTOS / SMP).
+ *
+ * @param core_id  CPU core to pin the task to. Pass `tskNO_AFFINITY`
+ *                 (or any value < 0 / >= portNUM_PROCESSORS) for no
+ *                 affinity (equivalent to `xTaskCreate`).
+ *
+ * On single-core builds (portNUM_PROCESSORS == 1) the core_id is
+ * ignored — `xTaskCreatePinnedToCore` is still safe but has no effect.
+ */
+static inline OS_Uint os_thread_create_pinned(OS_Thread *t, const char *name,
+                                              void (*entry)(OS_Ulong),
+                                              OS_Ulong input, uint8_t *stack,
+                                              OS_Ulong stack_size, OS_Uint priority,
+                                              OS_Uint /*preempt*/, OS_Ulong /*slice*/,
+                                              OS_Uint auto_start, int core_id)
+{
+    os_thread_start_t *params =
+        (os_thread_start_t *)pvPortMalloc(sizeof(os_thread_start_t));
+    if (!params) return 1;
+    params->entry = entry;
+    params->arg = input;
+    const BaseType_t affinity =
+        (core_id < 0) ? tskNO_AFFINITY : (BaseType_t)core_id;
+    BaseType_t res = xTaskCreatePinnedToCore(os_thread_start_trampoline, name,
+                                             stack_size / sizeof(StackType_t),
+                                             params, priority, t, affinity);
+    if (res != pdPASS) {
+        vPortFree(params);
+        return 1;
+    }
+    if (!auto_start)
+        vTaskSuspend(*t);
+    return OS_SUCCESS;
+}
+
+/// Returns the FreeRTOS core ID the calling task is currently running on
+/// (0 or 1 on ESP32-S3). Returns 0 on single-core builds.
+static inline int os_get_current_core_id(void)
+{
+#if (configNUM_CORES > 1) || (portNUM_PROCESSORS > 1)
+    return (int)xPortGetCoreID();
+#else
+    return 0;
+#endif
+}
+
 static inline OS_Uint os_thread_resume(OS_Thread *t)   { vTaskResume(*t); return OS_SUCCESS; }
 static inline OS_Uint os_thread_suspend(OS_Thread *t)  { vTaskSuspend(*t); return OS_SUCCESS; }
 static inline OS_Uint os_thread_delete(OS_Thread *t)   { vTaskDelete(*t);  return OS_SUCCESS; }
@@ -276,6 +323,17 @@ static inline OS_Uint os_thread_create(OS_Thread *t, const char *name,
 { (void)t; (void)name; (void)entry; (void)input; (void)stack;
   (void)stack_size; (void)priority; (void)preempt; (void)slice;
   (void)auto_start; return OS_SUCCESS; }
+/* Bare-metal stub — core_id is ignored. */
+static inline OS_Uint os_thread_create_pinned(OS_Thread *t, const char *name,
+                                              void (*entry)(OS_Ulong),
+                                              OS_Ulong input, uint8_t *stack,
+                                              OS_Ulong stack_size, OS_Uint priority,
+                                              OS_Uint preempt, OS_Ulong slice,
+                                              OS_Uint auto_start, int core_id)
+{ (void)core_id;
+  return os_thread_create(t, name, entry, input, stack, stack_size,
+                          priority, preempt, slice, auto_start); }
+static inline int os_get_current_core_id(void) { return 0; }
 static inline OS_Uint os_thread_resume(OS_Thread *t)    { (void)t; return OS_SUCCESS; }
 static inline OS_Uint os_thread_suspend(OS_Thread *t)   { (void)t; return OS_SUCCESS; }
 static inline OS_Uint os_thread_delete(OS_Thread *t)    { (void)t; return OS_SUCCESS; }

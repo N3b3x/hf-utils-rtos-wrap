@@ -401,20 +401,19 @@ bool os_thread_create_ex_pinned(OS_Thread* txThread, const char* name,
  */
 bool os_thread_delete_ex(OS_Thread *txThread, bool suppressVerbose) noexcept
 {
-
-        OS_Uint err = os_thread_terminate(txThread);
-	if (err == OS_SUCCESS)
-	{
-		err = os_thread_delete(txThread);
-
-		if (err == OS_SUCCESS)
-		{
-			--g_ssp_common_thread_count; /// Decrement the overall system thread count
-			return true;
-		}
-	}
-        /// TODO: log appropriate error here
-    return false;
+    if (txThread == nullptr || *txThread == nullptr) {
+        return true;
+    }
+    // OsAbstraction maps both os_thread_terminate and os_thread_delete to
+    // vTaskDelete. Calling twice with the same handle corrupts FreeRTOS
+    // ready-blocked lists (LoadProhibited in uxListRemove).
+    (void)suppressVerbose;
+    os_thread_delete(txThread);
+    *txThread = nullptr;
+    if (g_ssp_common_thread_count > 0) {
+        --g_ssp_common_thread_count;
+    }
+    return true;
 }
 
 bool os_thread_resume_ex( OS_Thread* thread, bool suppressVerbose )

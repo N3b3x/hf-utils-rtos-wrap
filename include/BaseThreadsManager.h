@@ -510,26 +510,10 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopAllAndWaitToVerify(uint32_t wai
 			return threadsStoppedTracker.all();
 		};
 
-		/// Get the time the waiting is starting
-		const uint32_t waitStartTimeMsec = os_get_elapsed_time_msec();
-
 		/// Expecting true within the timeout specified
-		bool result = TestLogicWithTimeout(CheckIfAllHalSubThreadsAreStopped, true, waitToVerifyTimeoutMsec, timeBetweenChecksMsec);
-
-		/// Get total elapsed time in logic test function
-		const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
-
-		/// Print info to user.
-
-		if (result) {
-		}
-		else {
-		}
-
-		for(auto& threadMap : threadsManaged) {
-		}
-
-		return result; /// Return result
+		const bool result = TestLogicWithTimeout(
+		    CheckIfAllHalSubThreadsAreStopped, true, waitToVerifyTimeoutMsec, timeBetweenChecksMsec);
+		return result;
 	}
 
 	return false;
@@ -565,24 +549,10 @@ bool BaseThreadsManager<EnumType, MaxCount>::StopSelectedAndWaitToVerify(const s
 			return true;
 		};
 
-		const uint32_t waitStartTimeMsec = os_get_elapsed_time_msec();
-
 		/// Expecting true within the timeout specified
-		bool result = TestLogicWithTimeout(CheckIfAllSelectedThreadsAreStopped, true, waitToVerifyTimeoutMsec, timeBetweenChecksMsec);
-
-		const uint32_t elapsedStartTimeMsec = os_get_elapsed_time_msec() - waitStartTimeMsec;
-
-		/// Print info to user.
-
-		if (result) {
-		}
-		else {
-		}
-
-		for(const auto& enumValue : selectedEnums) {
-		}
-
-		return result; /// Return result
+		const bool result = TestLogicWithTimeout(
+		    CheckIfAllSelectedThreadsAreStopped, true, waitToVerifyTimeoutMsec, timeBetweenChecksMsec);
+		return result;
 	}
 
 	return false;

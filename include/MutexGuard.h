@@ -2,11 +2,6 @@
  * @file MutexGuard.h
  * @brief MutexGuard class definition.
  *
- * Nebula Tech Corporation
- *
- * Copyright © 2023 Nebula Tech Corporation. All Rights Reserved.
- * This file is part of HardFOC and is licensed under the GNU General Public License v3.0 or later.
- *
  * The MutexGuard class provides an RAII-style mechanism for owning a
  * mutex for the duration of a scoped block. When a MutexGuard object
  * is created, it attempts to take ownership of the mutex. When the
@@ -21,6 +16,7 @@
  * // mutex is released here
  * \endcode
  *
+ * @todo Add @copyright line once project copyright wording is finalised.
  */
 
 #ifndef MUTEXGUARD_H_

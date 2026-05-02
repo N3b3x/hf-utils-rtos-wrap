@@ -1,30 +1,53 @@
-[⬅️ Previous](Synchronization.md) | [🗂️ Index](index.md) | [➡️ Next](Console.md)
+[⬅️ Previous](Synchronization.md) | [🗂️ Index](index.md) | [➡️ Next](GenericTemplates.md)
 
 # Message Queues 📬
 
-The `OsQueue` template offers a simple way to pass messages between threads.
+`OsQueue<MessageType, Capacity>` is a typed, fixed-capacity queue backed by a
+FreeRTOS queue handle. The queue object is **eagerly constructed** in its
+constructor — there is no lazy-init dance and no extra wrapping mutex
+(FreeRTOS queues are already MT-safe).
 
 ## Highlights
-- Lazy initialization keeps memory usage low until the queue is used.
-- Template parameters enforce type safety.
-- Works smoothly with your `BaseThread` workers.
 
-## Lazy Creation
-Queues are created the first time you send or receive. This keeps memory usage minimal until the queue is actually needed.
+- **Type-safe:** message size is derived from `sizeof(T)` at compile time.
+- **Modern API:** `Send` / `Receive` take `uint32_t timeout_ms` (use `UINT32_MAX`
+  to wait forever). No `OS_Ulong` / `OS_WAIT_FOREVER` leakage.
+- **Inline storage:** capacity is fixed by the template parameter; no heap
+  allocation in the hot path.
+- **Validation:** `IsValid()` confirms the underlying handle was created.
 
-## Usage
-1. Declare an `OsQueue<T>` with the message type you want.
-2. Send items with `Push()` and retrieve them with `Pop()`.
-3. `Size()` returns the current number of messages in the queue.
+## Public surface
 
-## Quick Example
 ```cpp
-OsQueue<int, 64> q("Numbers", sizeof(int));
-q.Push(42);
-int val;
-if (q.Pop(val)) {
-    // use val
+template <typename MessageType, std::size_t kCapacity>
+class OsQueue {
+public:
+    explicit OsQueue(const char* name) noexcept;
+
+    bool Send(const MessageType& msg,
+              uint32_t timeout_ms = UINT32_MAX) noexcept;
+
+    bool Receive(MessageType& out,
+                 uint32_t timeout_ms = UINT32_MAX) noexcept;
+
+    [[nodiscard]] bool        IsValid()  const noexcept;
+    [[nodiscard]] std::size_t Capacity() const noexcept;
+};
+```
+
+## Quick example
+
+```cpp
+#include "OsQueue.h"
+
+OsQueue<int, /*Capacity=*/64> q{"Numbers"};
+
+q.Send(42);                                  // blocks forever (UINT32_MAX)
+
+int v;
+if (q.Receive(v, /*timeout_ms=*/100)) {
+    // got value within 100 ms
 }
 ```
 
-[⬅️ Previous](Synchronization.md) | [🗂️ Index](index.md) | [➡️ Next](Console.md)
+[⬅️ Previous](Synchronization.md) | [🗂️ Index](index.md) | [➡️ Next](GenericTemplates.md)

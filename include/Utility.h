@@ -8,15 +8,8 @@
 #include <functional>
 #include "OsUtility.h"
 
-/**
- * @enum time_unit_t
- * @brief Units used to express time values.
- */
-enum time_unit_t {
-    TIME_UNIT_US = 0,  /**< Microseconds */
-    TIME_UNIT_MS,      /**< Milliseconds */
-    TIME_UNIT_S        /**< Seconds */
-};
+// `enum time_unit_t` is declared in OsUtility.h (must be visible to its
+// C-facing function declarations); included transitively above.
 
 /**
  * @brief Helper to repeatedly check a condition until timeout.

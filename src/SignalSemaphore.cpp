@@ -1,10 +1,6 @@
 /**
  *
- * Nebula Tech Corporation
- *
- * Copyright © 2023 Nebula Tech Corporation. All Rights Reserved.
- * This file is part of HardFOC and is licensed under the GNU General Public License v3.0 or later.
- *
+ * @todo Add @copyright line once project copyright wording is finalised.
  */
 
 #include "SignalSemaphore.h"

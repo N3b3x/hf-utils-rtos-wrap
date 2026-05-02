@@ -2,10 +2,7 @@
  * @file FreeRTOSUtils.h
  * @brief FreeRTOS utility functions for error reporting and debugging.
  *
- * Nebula Tech Corporation
- *
- * Copyright © 2023 Nebula Tech Corporation. All Rights Reserved.
- * This file is part of HardFOC and is licensed under the GNU General Public License v3.0 or later.
+ * @todo Add @copyright line once project copyright wording is finalised.
  */
 
 #ifndef FREERTOS_UTILS_H_

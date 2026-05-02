@@ -2,17 +2,12 @@
  * @file BaseThread.h
  * @brief Abstract base class for long running worker threads.
  *
- * Nebula Tech Corporation
- *
- * Copyright © 2023 Nebula Tech Corporation. All rights reserved.
- * This file is part of HardFOC and is licensed under the GNU General Public
- * License v3.0 or later.
- *
  * The BaseThread class provides a foundation for implementing service or
  * clinical threads.  Each thread runs continuously between calls to
  * `Start()` and `Stop()`, executing a setup routine once and then repeatedly
  * calling `Step()` until a stop is requested.  Derived classes implement the
  * virtual Setup, Step and Exit hooks to provide their behavior.
+ * @todo Add @copyright line once project copyright wording is finalised.
  */
 
 #ifndef BaseThread_H

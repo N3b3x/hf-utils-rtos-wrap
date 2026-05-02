@@ -15,11 +15,11 @@
  *
  * @author Nebiyu Tadesse
  * @date 2025
- * @copyright HardFOC
  *
  * @note Platform support includes ESP32 (FreeRTOS), STM32 (future), and
  *       RP2040 (future). Bare-metal no-op stubs are provided when no RTOS
  *       is selected (HF_RTOS_NONE).
+ * @todo Add @copyright line once project copyright wording is finalised.
  */
 
 #pragma once

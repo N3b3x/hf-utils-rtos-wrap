@@ -2,14 +2,10 @@
  * @file Mutex.h
  * @brief Mutex class definition.
  *
- * Nebula Tech Corporation
- *
- * Copyright © 2023 Nebula Tech Corporation. All Rights Reserved.
- * This file is part of HardFOC and is licensed under the GNU General Public License v3.0 or later.
- *
  * The Mutex class provides wrapper for a "named" mutex that is created dynamically
  *    created. When the Mutex object goes out of scope, the threadX mustex is deleted.
  *
+ * @todo Add @copyright line once project copyright wording is finalised.
  */
 
 

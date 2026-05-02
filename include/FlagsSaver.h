@@ -1,535 +1,272 @@
 /**
+ * @file FlagsSaver.h
+ * @brief Atomic two-state flag bitset with optional event-flag waiter.
  *
- * Nebula Tech Corporation
+ * Three types in one header:
+ *   - `hf::FlagsReader<FlagId, kCount>`  — pure-virtual read-side ABC.
+ *   - `hf::FlagsWriter<FlagId, kCount>`  — pure-virtual write-side ABC.
+ *   - `hf::FlagsSaver<FlagId, kCount>`   — concrete impl deriving from both.
  *
- * Copyright © 2023 Nebula Tech Corporation. All Rights Reserved.
- * This file is part of HardFOC and is licensed under the GNU General Public License v3.0 or later.
+ * Pass an `hf::FlagsReader*` to consumers that may only inspect / wait, and
+ * an `hf::FlagsWriter*` to consumers that may only publish — keeps the
+ * apps↔middleware layering honest.
  *
+ * @par Storage
+ *   Each slot holds one bit (0 = Cleared, 1 = Set); slots are packed into
+ *   `std::atomic<uint64_t>` words (64 slots per word). Lookups and writes
+ *   are lock-free. A change to any slot bumps a 32-bit sequence counter
+ *   and signals a single bit on a lazily-created `OsEventFlags`.
+ *
+ * @par Thread-safety
+ *   - Set / Clear / IsSet / Snapshot / Seq / LastChangeMs: lock-free; safe
+ *     from any task context. Not ISR-safe (FreeRTOS event-group set is not
+ *     ISR-safe via this path).
+ *   - WaitForChange: backed by a FreeRTOS event group; do not call from ISR.
+ *
+ * @par Allocation
+ *   No heap allocation. Storage is a fixed-size atomic word array sized at
+ *   compile time. The event group is created on first use.
  */
+#ifndef HF_UTILS_RTOS_WRAP_FLAGSSAVER_H_
+#define HF_UTILS_RTOS_WRAP_FLAGSSAVER_H_
 
-#ifndef UTILITIES_COMMON_FLAGSSAVER_H_
-#define UTILITIES_COMMON_FLAGSSAVER_H_
+#include <atomic>
+#include <climits>
+#include <cstddef>
+#include <cstdint>
 
-#include <bitset>
-#include <functional>
-#include "UTILITIES/common/RtosCompat.h"
+#include "OsAbstraction.h"
 
-#include "UTILITIES/common/FlagsSaverGettersExposer.h"
-#include "UTILITIES/common/FlagsSaverSettersExposer.h"
-#include <UTILITIES/common/EnumeratedSetStatus.h>
-#include <UTILITIES/common/ThingsToString.h>
-#include <UTILITIES/common/MutexGuard.h>
-
-//==============================================================//
-/// CLASS
-//==============================================================//
+namespace hf {
 
 /**
- * @class FlagsSaver
- * @brief This class is used to save and manage flags.  Flags status is indexed via an enum s the index.   Skipped enum values are ignored,
- *          but they do take up space.   Each flags is in one of the following states:
- *       Unknown,   // Initial state
- *       Ignored,   //
- *       Set,       // The flag is determined to exist
- *       Clear      // The flag is determined not to exist
+ * @brief Snapshot of a `FlagsSaver` at a point in time.
  *
- * @tparam FlagsType The type of the flag.
- * @tparam N The size of the bitset.
+ * Tail-template sized so a snapshot fits any specialisation; the writer
+ * fills `bits[0 .. kWordCount - 1]`, leaves the rest zero.
  */
-template <typename FlagsType, size_t N>
-class FlagsSaver : public FlagsSaverGettersExposer<FlagsType>, public FlagsSaverSettersExposer<FlagsType>
-{
-public:
-
-	//====================================//
-	/// CONSTRUCTOR
-	//====================================//
-
-	FlagsSaver(const char* (*enumToStringConverter)( FlagsType ) = nullptr);
-	virtual ~FlagsSaver();
-
-	FlagsSaver( const FlagsSaver& copy ) noexcept = delete;
-	FlagsSaver& operator = ( const FlagsSaver& copy ) noexcept = delete;
-
-	//====================================//
-	/// FLAGS SETTERS
-	//====================================//
-
-	/**
-	 * @brief Set an flag. Can only be set by the variable owner thread.
-	 * @param flag The flag to set.
-     * @return True if the actions successful, false otherwise.
-	 */
-    bool SetFlag(FlagsType flag) noexcept override;
-
-    /**
-     * @brief Clear an flag.
-     * @param flag The flag to clear.
-     * @return True if the actions successful, false otherwise.
-     */
-    bool ClearFlag(FlagsType flag) noexcept override;
-
-    /**
-     * @brief Sets flag status as unknown.
-     * @param flag The flag to ignore.
-     * @return True if the actions successful, false otherwise.
-     */
-    bool SetUnknown(FlagsType flag) noexcept override;
-
-    /**
-     * @brief Sets all flag status as unknown.
-     * @return True if the actions successful, false otherwise.
-     */
-    bool SetAllUnknown() noexcept;
-
-	//====================================//
-	/// FLAGS CHECKERS
-	//====================================//
-
-    /**
-     * @brief Check if flag is set.
-     * @param flag The flag to check.
-     * @return True if the flag is set, false otherwise.
-     */
-     bool IsFlagSet(FlagsType flag) noexcept override;
-
-    /**
-     * @brief Check if an flag is set.
-     * @param flag The flag to check.
-     * @return True if the flag is set, false otherwise.
-     */
-     bool IsAnyFlagsSet() noexcept override;
-
-    /**
-     * @brief Check if an flag is unknown.
-     * @param flag The flag to check.
-     * @return True if the flag is ignored, false otherwise.
-     */
-     bool IsFlagUnknown(FlagsType flag) noexcept override;
-
- 	//====================================//
- 	/// NEW FLAG ACTIVITY GETTERS
- 	//====================================//
-
-     /**
-      * @brief Waits for a new flag setting/clearing activities within timeout.
-      * @param[in] waitTime The maximum time to wait for new flag activity.
-      * @return True of new flag activity happened in specified timeout, false otherwise.
-      */
-     bool GetNewFlagsActivity(ULONG waitTime = TX_WAIT_FOREVER) noexcept;
-
-     /**
-      * @brief Clears the New Data Event generated.
-      * @return True if actions are true, false otherwise.
-      */
-     bool ClearNewDataEvent() noexcept;
-
-  	//====================================//
-  	/// PRIVILEDGE SETTERS
-  	//====================================//
-
-     /**
-      * @brief Sets the specified thread as the owner of the data getters operation.
-      *
-      * @param dataGettersOwnerThreadArg Pointer to thread wanting to set as owner.
-      *
-      * @return True if successful in setting the owner, false otherwise.
-      */
-     bool SetGettersOwnerThreadTo(TX_THREAD* dataGetterOwnerThreadArg) noexcept;
-
-     /**
-      * @brief Sets the specified thread as the owner of the data setter operation.
-      *
-      * @param dataSetterOwnerThreadArg Pointer to thread wanting to set as owner.
-      *
-      * @return True if successful in setting the owner, false otherwise.
-      */
-     bool SetSetterOwnerThreadTo(TX_THREAD* dataSetterOwnerThreadArg) noexcept;
-
-     /**
-      * @brief Gets the flag getter owner thread.
-      * @return Flags getter owner thread pointer.
-      */
-     TX_THREAD* GetFlagsGetterOwnerThread() noexcept;
-
-     /**
-      * @brief Gets the flag setter owner thread.
-      * @return Flags setter owner thread pointer.
-      */
-     TX_THREAD* GetFlagsSetterOwnerThread() noexcept;
-
-   	//====================================//
-   	/// DATA PRINTERS
-   	//====================================//
-
-     /**
-      * @brief Prints what the flag is currently set to.
-      * @param flag FlagsType wanting to print info of.
-      */
-     void PrintFlags( FlagsType flag) noexcept;
-
-private:
-
-     /**
-      * @brief Helper function to support lazy initialization.
-      *
-      * @return true if initialized, false otherwise.
-      */
-     bool EnsureInitialized() noexcept
-     {
-         if (!initialized)
-         {
-             initialized = Initialize();
-         }
-         return initialized;
-     }
-
-	/**
-	 * @brief Function to initialize class.
-	 * Generally, the initialize function should return false rather than causing a low-level fault.
-	 *
-	 * @return true if able to initialize, false otherwise.
-	 */
-	bool Initialize() noexcept;
-
-    TX_THREAD* dataSetterOwnerThread;
-    TX_THREAD* dataGetterOwnerThread;
-
-    TX_EVENT_FLAGS_GROUP dataAvailableFlagGroup;  	/**< Event flag to signal data availability. */
-    bool eventFlagGroupCreated;						/**< Flag indicating that event flag group has been created. */
-    static const ULONG DATA_AVAILABLE_FLAG = 0x01;  /**< Named constant for the event flag value */
-    static const char dataAvailableFlagGroupName[];
-
-    Mutex mutex;       ///< Mutex for class and ownership.
-    static const char mutexName[];
-
-    bool initialized;		   ///< To make sure class is properly initialized.
-    static const bool verbose; ///< Verbosity flag.
-
-    EnumeratedSetStatus<FlagsType, FlagsStatus, 2, N> flagsStatus;    ///< Bitset to store flag status
-
+template <std::size_t kWordCount>
+struct FlagsSnapshot {
+    uint64_t bits[kWordCount > 0 ? kWordCount : 1]{};
+    uint32_t seq{0};
+    uint32_t last_change_ms{0};
 };
 
-//==============================================================//
-/// VERBOSE??
-//==============================================================//
-
-template <typename FlagsType, size_t N>
-const bool FlagsSaver<FlagsType,N>::verbose = false;
-
-//==============================================================//
-//==============================================================//
-
-template <typename FlagsType, size_t N>
-const char FlagsSaver<FlagsType,N>::mutexName[] = "FlagsSaver-Mutex";
-
-template <typename FlagsType, size_t N>
-const char FlagsSaver<FlagsType,N>::dataAvailableFlagGroupName[] = "FlagsSaver-EventFlagGroup";
-
 /**
- * @brief Constructor for FlagsSaver.
- * @param flagToStringFunction Function to convert flag to string.
+ * @brief Read-side ABC for `FlagsSaver`.
  */
-template <typename FlagsType, size_t N>
-FlagsSaver<FlagsType,N>::FlagsSaver(const char* (*enumToStringConverter)( FlagsType )) :
-	dataSetterOwnerThread(nullptr),
-	dataGetterOwnerThread(nullptr),
-	eventFlagGroupCreated(false),
-	mutex( mutexName),
-	initialized(false),
-	flagsStatus( FlagsStatus::Unknown, enumToStringConverter,  &FlagsStatusToString )  // Each flag starts with an unknown status
-{
-	/// No code at this time.
-}
+template <typename FlagId, std::size_t kCount>
+class FlagsReader {
+public:
+    static constexpr std::size_t kWordCount =
+        (kCount + 63U) / 64U > 0U ? (kCount + 63U) / 64U : 1U;
+    using Snapshot = FlagsSnapshot<kWordCount>;
+
+    virtual ~FlagsReader() noexcept = default;
+
+    /// True if @p id is currently set.
+    [[nodiscard]] virtual bool IsSet(FlagId id) const noexcept = 0;
+
+    /// Copy current bit state + sequence + last-change timestamp into @p out.
+    virtual void Snapshot_(Snapshot& out) const noexcept = 0;
+
+    /// Monotonic change counter; increments on every Set/Clear that
+    /// actually toggled state.
+    [[nodiscard]] virtual uint32_t Seq() const noexcept = 0;
+
+    /// Most recent `now_ms` value passed to `Set` / `Clear` (0 if never).
+    [[nodiscard]] virtual uint32_t LastChangeMs() const noexcept = 0;
+
+    /**
+     * @brief Block up to @p timeout_ms waiting for any change since the
+     *        last call to `WaitForChange` or `ClearWaitEvent`.
+     * @return `true` on signal; `false` on timeout / waiter unavailable.
+     */
+    virtual bool WaitForChange(uint32_t timeout_ms) noexcept = 0;
+
+    /// Discard any pending change-signal without waiting.
+    virtual bool ClearWaitEvent() noexcept = 0;
+};
 
 /**
- * @brief Destructor for FlagsSaver.
+ * @brief Write-side ABC for `FlagsSaver`.
  */
-template <typename FlagsType, size_t N>
-FlagsSaver<FlagsType,N>::~FlagsSaver()
-{
-  /// No code at this time
-}
+template <typename FlagId, std::size_t kCount>
+class FlagsWriter {
+public:
+    virtual ~FlagsWriter() noexcept = default;
+
+    /**
+     * @brief Mark @p id set. Idempotent: returns `false` if state was
+     *        already `Set` (no event signalled).
+     * @param now_ms Optional timestamp recorded as `LastChangeMs()` when
+     *               the bit actually transitioned. Pass 0 to skip.
+     */
+    virtual bool Set(FlagId id, uint32_t now_ms = 0) noexcept = 0;
+
+    /**
+     * @brief Mark @p id cleared. Idempotent: returns `false` if state was
+     *        already `Cleared` (no event signalled).
+     */
+    virtual bool Clear(FlagId id, uint32_t now_ms = 0) noexcept = 0;
+
+    /// Reset every slot to `Cleared` and signal a change.
+    virtual bool ClearAll(uint32_t now_ms = 0) noexcept = 0;
+};
 
 /**
- * @brief Function to initialize class.
- * Generally, the initialize function should return false rather than causing a low-level fault.
+ * @brief Concrete two-state flag bitset.
  *
- * @return true if able to initialize, false otherwise.
+ * @tparam FlagId  Strongly-typed enum (or any integer-castable type)
+ *                 indexing slots; must produce values in `[0, kCount)`.
+ * @tparam kCount  Number of slots.
  */
-template <typename FlagsType, size_t N>
-bool FlagsSaver<FlagsType,N>::Initialize() noexcept
+template <typename FlagId, std::size_t kCount>
+class FlagsSaver final
+    : public FlagsReader<FlagId, kCount>
+    , public FlagsWriter<FlagId, kCount>
 {
-	bool success = false;
+public:
+    using Base     = FlagsReader<FlagId, kCount>;
+    using Snapshot = typename Base::Snapshot;
+    static constexpr std::size_t kWordCount = Base::kWordCount;
 
-	/// Create the mutex and lock it, check for success
-	MutexGuard guard(mutex, MutexGuard::MaxInitializationTimeMsec, &success);
+    FlagsSaver() noexcept = default;
 
-	if( success)
-	{
-		if(!eventFlagGroupCreated)
-		{
-			eventFlagGroupCreated = CreateTxEventFlags(dataAvailableFlagGroup, dataAvailableFlagGroupName);
-		}
-		return eventFlagGroupCreated;
-	}
-	return false;
-}
+    ~FlagsSaver() override
+    {
+        if (event_group_created_) {
+            (void)os_event_group_delete(&event_group_);
+            event_group_created_ = false;
+        }
+    }
 
-/**
- * @brief Sets the calling thread as the owner of the retrieval operation.
- *
- * If no other thread is currently waiting for data, this function sets the calling thread as the owner.
- *
- * @return True if successful in setting the owner, false otherwise.
- */
-template <typename FlagsType, size_t N>
-bool FlagsSaver<FlagsType,N>::SetSetterOwnerThreadTo(TX_THREAD* dataSetterOwnerThreadArg) noexcept {
-    if(dataSetterOwnerThreadArg != nullptr) {
-    	/// If no thread is currently waiting for data, set the current thread as the owner
-    	dataSetterOwnerThread = dataSetterOwnerThreadArg;
+    FlagsSaver(const FlagsSaver&)            = delete;
+    FlagsSaver& operator=(const FlagsSaver&) = delete;
+
+    /* ── Writer surface ──────────────────────────────────────────── */
+
+    bool Set(FlagId id, uint32_t now_ms = 0) noexcept override
+    {
+        return WriteSlot_(id, true, now_ms);
+    }
+
+    bool Clear(FlagId id, uint32_t now_ms = 0) noexcept override
+    {
+        return WriteSlot_(id, false, now_ms);
+    }
+
+    bool ClearAll(uint32_t now_ms = 0) noexcept override
+    {
+        bool changed = false;
+        for (auto& w : words_) {
+            const uint64_t prev = w.exchange(0, std::memory_order_acq_rel);
+            if (prev != 0U) changed = true;
+        }
+        if (!changed) return false;
+        if (now_ms != 0U) last_change_ms_.store(now_ms, std::memory_order_release);
+        SignalChange_();
         return true;
     }
-    return false;
-}
 
-/**
- * @brief Sets the specified thread as the owner of the data getters operation.
- *
- * @param dataGettersOwnerThreadArg Pointer to thread wanting to set as owner.
- *
- * @return True if successful in setting the owner, false otherwise.
- */
-template <typename FlagsType, size_t N>
-bool FlagsSaver<FlagsType,N>::SetGettersOwnerThreadTo(TX_THREAD* dataGetterOwnerThreadArg) noexcept {
-    if(dataGetterOwnerThreadArg != nullptr) {
-    	/// If no thread is currently waiting for data, set the current thread as the owner
-    	dataGetterOwnerThread = dataGetterOwnerThreadArg;
+    /* ── Reader surface ──────────────────────────────────────────── */
+
+    [[nodiscard]] bool IsSet(FlagId id) const noexcept override
+    {
+        const std::size_t idx = static_cast<std::size_t>(id);
+        if (idx >= kCount) return false;
+        const std::size_t word = idx / 64U;
+        const std::size_t bit  = idx % 64U;
+        return (words_[word].load(std::memory_order_acquire)
+                & (uint64_t{1} << bit)) != 0U;
+    }
+
+    void Snapshot_(Snapshot& out) const noexcept override
+    {
+        for (std::size_t i = 0; i < kWordCount; ++i) {
+            out.bits[i] = words_[i].load(std::memory_order_acquire);
+        }
+        out.seq            = seq_.load(std::memory_order_acquire);
+        out.last_change_ms = last_change_ms_.load(std::memory_order_acquire);
+    }
+
+    [[nodiscard]] uint32_t Seq() const noexcept override
+    {
+        return seq_.load(std::memory_order_acquire);
+    }
+
+    [[nodiscard]] uint32_t LastChangeMs() const noexcept override
+    {
+        return last_change_ms_.load(std::memory_order_acquire);
+    }
+
+    bool WaitForChange(uint32_t timeout_ms) noexcept override
+    {
+        if (!EnsureEventGroup_()) return false;
+        OS_Ulong actual = 0;
+        const OS_Ulong wait = (timeout_ms == UINT32_MAX)
+                                  ? static_cast<OS_Ulong>(OS_WAIT_FOREVER)
+                                  : static_cast<OS_Ulong>(timeout_ms);
+        const OS_Uint rc = os_event_group_get(&event_group_, kEventBit_,
+                                              static_cast<OS_Uint>(OS_OR),
+                                              &actual, wait);
+        return (rc == OS_SUCCESS) && ((actual & kEventBit_) != 0U);
+    }
+
+    bool ClearWaitEvent() noexcept override
+    {
+        if (!EnsureEventGroup_()) return false;
+        return os_event_group_clear(&event_group_, kEventBit_) == OS_SUCCESS;
+    }
+
+private:
+    bool WriteSlot_(FlagId id, bool set, uint32_t now_ms) noexcept
+    {
+        const std::size_t idx = static_cast<std::size_t>(id);
+        if (idx >= kCount) return false;
+
+        const std::size_t word = idx / 64U;
+        const uint64_t    mask = uint64_t{1} << (idx % 64U);
+        auto&             w    = words_[word];
+
+        const uint64_t prev = set
+            ? w.fetch_or(mask,  std::memory_order_acq_rel)
+            : w.fetch_and(~mask, std::memory_order_acq_rel);
+
+        const bool was_set = (prev & mask) != 0U;
+        if (was_set == set) return false;  // no transition
+
+        if (now_ms != 0U) last_change_ms_.store(now_ms, std::memory_order_release);
+        SignalChange_();
         return true;
     }
-    return false;
-}
 
-/**
- * @brief Returns owner thread.
- *
- * @return Owner thread pointer.
- */
-template <typename FlagsType, size_t N>
-TX_THREAD* FlagsSaver<FlagsType,N>::GetFlagsGetterOwnerThread() noexcept{
-	return dataGetterOwnerThread;
-}
-
-/**
- * @brief Returns owner thread.
- *
- * @return Owner thread pointer.
- */
-template <typename FlagsType, size_t N>
-TX_THREAD* FlagsSaver<FlagsType,N>::GetFlagsSetterOwnerThread() noexcept {
-	return dataSetterOwnerThread;
-}
-
-/**
- * @brief Waits for a new flag setting/clearing activities within timeout.
- * @param[in] waitTime The maximum time to wait for new flag activity.
- * @return True of new flag activity happened in specified timeout, false otherwise.
- */
-template <typename FlagsType, size_t N>
-bool FlagsSaver<FlagsType,N>::GetNewFlagsActivity(ULONG waitTime) noexcept {
-    ULONG actual_flags;
-
-    UINT status = tx_event_flags_get(&dataAvailableFlagGroup, DATA_AVAILABLE_FLAG, TX_OR_CLEAR, &actual_flags, waitTime);
-
-    if (status == TX_SUCCESS && (actual_flags & DATA_AVAILABLE_FLAG)) {
-    	return true;
-    }
-
-	/// If all failed
-    return false;
-}
-
-/**
- * @brief Set an flag. Can only be set by the variable owner thread.
- * @param flag The flag to set.
- */
-template <typename FlagsType, size_t N>
-bool FlagsSaver<FlagsType,N>::SetFlag(FlagsType flag) noexcept {
-    if(EnsureInitialized())
+    void SignalChange_() noexcept
     {
-    	/// If no thread has been marked as the data setter owner thread or caller is owner
-    	if(dataSetterOwnerThread == nullptr || dataSetterOwnerThread == tx_thread_identify()) {
-    		/// if not already set, Set the flag in a mutex protected manner
-    		if( !flagsStatus.IsStatus(flag, FlagsStatus::Set) ) {
-				/// Set the flag in a mutex protected manner
-				MutexGuard guard((TX_MUTEX*)&mutex);
-				flagsStatus.Set(flag, FlagsStatus::Set);
-				PrintFlags(flag);
-
-				/// Signal that new data is available
-				return SetTxEventFlags(dataAvailableFlagGroup, DATA_AVAILABLE_FLAG);
-    		}
-
-			/// If not a new event, just continue
-			return (true);
-    	}
+        seq_.fetch_add(1, std::memory_order_acq_rel);
+        if (EnsureEventGroup_()) {
+            (void)os_event_group_set(&event_group_, kEventBit_);
+        }
     }
 
-    return false;
-}
-
-/**
- * @brief Clear an flag.
- * @param flag The flag to clear.
- */
-template <typename FlagsType, size_t N>
-bool FlagsSaver<FlagsType,N>::ClearFlag(FlagsType flag) noexcept {
-    if(EnsureInitialized())
+    bool EnsureEventGroup_() noexcept
     {
-    	/// If no thread has been marked as the data setter owner thread or caller is owner
-    	if(dataSetterOwnerThread == nullptr || dataSetterOwnerThread == tx_thread_identify()) {
-    		/// if not already cleared, clear the flag in a mutex protected manner
-    		if( !flagsStatus.IsStatus(flag, FlagsStatus::Cleared) ) {
-				/// Set the flag in a mutex protected manner
-				MutexGuard guard((TX_MUTEX*)&mutex);
-				flagsStatus.Set(flag, FlagsStatus::Cleared );
-				PrintFlags(flag);
-
-				/// Signal that new data is available
-				return SetTxEventFlags(dataAvailableFlagGroup, DATA_AVAILABLE_FLAG, true);
-    		}
-
-			/// If not a new event, just continue
-			return (true);
-    	}
+        if (event_group_created_) return true;
+        if (os_event_group_create(&event_group_, "FlagsSaver") == OS_SUCCESS) {
+            event_group_created_ = true;
+        }
+        return event_group_created_;
     }
 
-    return false;
-}
+    static constexpr OS_Ulong kEventBit_ = 0x1U;
 
-template <typename FlagsType, size_t N>
-bool FlagsSaver<FlagsType,N>::SetUnknown(FlagsType flag) noexcept {
-    if(EnsureInitialized())
-    {
-    	/// If no thread has been marked as the data setter owner thread or caller is owner
-    	if(dataSetterOwnerThread == nullptr || dataSetterOwnerThread == tx_thread_identify()) {
-    		/// if not already cleared, clear the flag in a mutex protected manner
-    		if( !flagsStatus.IsStatus(flag, FlagsStatus::Unknown) ) {
-				/// Set the flag in a mutex protected manner
-				MutexGuard guard((TX_MUTEX*)&mutex);
-				flagsStatus.Set(flag, FlagsStatus::Unknown );
-				PrintFlags(flag);
+    std::atomic<uint64_t> words_[kWordCount]{};
+    std::atomic<uint32_t> seq_{0};
+    std::atomic<uint32_t> last_change_ms_{0};
+    OS_EventGroup         event_group_{};
+    bool                  event_group_created_{false};
+};
 
-				/// Signal that new data is available
-				return SetTxEventFlags(dataAvailableFlagGroup, DATA_AVAILABLE_FLAG, true);
-    		}
+}  // namespace hf
 
-			/// If not a new event, just continue
-			return (true);
-    	}
-    }
-
-    return false;
-}
-
-template <typename FlagsType, size_t N> bool FlagsSaver<FlagsType,N>::SetAllUnknown() noexcept
-{
-    if( EnsureInitialized())
-    {
-    	/// If no thread has been marked as the data setter owner thread or caller is owner
-    	if(dataSetterOwnerThread == nullptr || dataSetterOwnerThread == tx_thread_identify())
-    	{
-    		MutexGuard guard(mutex);
-
-    		/// if not already cleared, clear the flag in a mutex protected manner
-    		flagsStatus.SetAll( FlagsStatus::Unknown);
-    		return SetTxEventFlags(dataAvailableFlagGroup, DATA_AVAILABLE_FLAG, true);
-    	}
-    }
-
-    return false;
-}
-
-template <typename FlagsType, size_t N>
-bool FlagsSaver<FlagsType,N>::IsFlagSet(FlagsType flag) noexcept
-{
-    if(EnsureInitialized()) {
-    	/// If no thread has been marked as the data setter owner thread or caller is owner
-    	if(dataGetterOwnerThread == nullptr || dataGetterOwnerThread == tx_thread_identify()) {
-    		/// Give protected access to the data
-			MutexGuard guard((TX_MUTEX*)&mutex);
-
-		    return flagsStatus.IsStatus(flag, FlagsStatus::Set);
-    	}
-    }
-
-    /// Otherwise, just return false.
-    return false;
-}
-
-/**
- * @brief Check if an flag is set.
- * @param flag The flag to check.
- * @return True if the flag is set, false otherwise.
- */
-template <typename FlagsType, size_t N>
-bool FlagsSaver<FlagsType,N>::IsAnyFlagsSet() noexcept
-{
-    if(EnsureInitialized()) {
-    	/// If no thread has been marked as the data setter owner thread or caller is owner
-    	if(dataGetterOwnerThread == nullptr || dataGetterOwnerThread == tx_thread_identify()) {
-    		/// Give protected access to the data
-			MutexGuard guard((TX_MUTEX*)&mutex);
-
-			 return flagsStatus.IsAny(FlagsStatus::Set);
-    	}
-    }
-
-    /// Otherwise, just return false.
-    return false;
-}
-
-/**
- * @brief Check if an flag is ignored.
- * @param flag The flag to check.
- * @return True if the flag is ignored, false otherwise.
- */
-template <typename FlagsType, size_t N>
-bool FlagsSaver<FlagsType,N>::IsFlagUnknown(FlagsType flag) noexcept
-{
-    if(EnsureInitialized()) {
-    	/// If no thread has been marked as the data setter owner thread or caller is owner
-    	if(dataGetterOwnerThread == nullptr || dataGetterOwnerThread == tx_thread_identify()) {
-    		/// Give protected access to the data
-			MutexGuard guard((TX_MUTEX*)&mutex);
-
-		    return flagsStatus.IsStatus(flag, FlagsStatus::Unknown);
-    	}
-    }
-
-    /// Otherwise, just return false.
-    return false;
-}
-
-/**
- * @brief Clears the new internal new data flags.
- *
- * @return True if successful, false otherwise.
- */
-template <typename FlagsType, size_t N>
-bool FlagsSaver<FlagsType,N>::ClearNewDataEvent() noexcept {
-    return ClearTxEventFlags(dataAvailableFlagGroup, ~DATA_AVAILABLE_FLAG, true);
-}
-
-/**
- * @brief Print an flag.
- * @param flag The flag to print.
- */
-template <typename FlagsType, size_t N>
-void FlagsSaver<FlagsType,N>::PrintFlags( FlagsType flag) noexcept
-{
-	// ConsolePort logging removed
-	(void)flag;
-}
-
-#endif /* UTILITIES_COMMON_FLAGSSAVER_H_ */
+#endif /* HF_UTILS_RTOS_WRAP_FLAGSSAVER_H_ */

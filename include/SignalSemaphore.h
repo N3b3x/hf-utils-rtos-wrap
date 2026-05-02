@@ -2,13 +2,9 @@
  * @file SignalSemaphore.h
  * @brief SignalSemaphore class definition.
  *
- * Nebula Tech Corporation
- *
- * Copyright © 2023 Nebula Tech Corporation. All Rights Reserved.
- * This file is part of HardFOC and is licensed under the GNU General Public License v3.0 or later.
- *
  * The SignalSemaphore class provides a wrapper for a named semaphore that is dynamically
  * created. When the SignalSemaphore object goes out of scope, the semaphore is deleted.
+ * @todo Add @copyright line once project copyright wording is finalised.
  */
 
 #ifndef SIGNALSEMAPHORE_H

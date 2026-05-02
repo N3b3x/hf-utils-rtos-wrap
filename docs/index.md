@@ -1,18 +1,20 @@
 [🏠 Back to README](../README.md) | [➡️ Next](BaseThread.md)
 
-# HF-RTOSW-ESPIDF Documentation 📚
+# hf-utils-rtos-wrap Documentation 📚
 
-Welcome! This section collects all articles describing the RTOS wrapper. Each page has navigation links so you can easily browse through the topics.
+Guides for the RTOS wrapper library. Each page links to the next so you can
+read straight through, or jump in via the table of contents below.
 
 ## 📜 Table of Contents
-1. [Threading with BaseThread](BaseThread.md)
-2. [Synchronization Primitives](Synchronization.md)
-3. [Message Queues](Queues.md)
-4. [RTOS Abstraction](RTOSAbstraction.md)
-5. [Periodic Timers](Timers.md)
-6. [Utility Helpers](Utility.md)
-7. 😊 [Critical Guards](Synchronization.md#criticalguard)
+1. [Threading with `BaseThread`](BaseThread.md)
+2. [Synchronization Primitives](Synchronization.md) — `RtosMutex`, `Mutex`, `MutexGuard`, `SignalSemaphore`, `OsEventFlags`, `CriticalGuard`
+3. [Message Queues](Queues.md) — `OsQueue<T, Capacity>`
+4. [Generic Templates](GenericTemplates.md) — `hf::FlagsSaver`, `hf::SeqlockSnapshot`, `hf::ErrorHistory`
+5. [RTOS Abstraction](RTOSAbstraction.md) — the C portability layer (`OsAbstraction.h` / `OsUtility.h`)
+6. [Periodic Timers](Timers.md) — `PeriodicTimer`
+7. [Utility Helpers](Utility.md) — `WaitForCondition`, time helpers, `BaseThreadsManager`
 
-Enjoy reading and happy coding! 🚀
+For a one-line summary of every header in the library see the
+[README header table](../README.md#header-summary).
 
 [🏠 Back to README](../README.md) | [➡️ Next](BaseThread.md)

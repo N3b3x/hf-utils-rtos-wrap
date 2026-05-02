@@ -1,120 +1,119 @@
 /**
-  * Nebula Tech Corporation
-  *
-  * Copyright © 2023 Nebula Tech Corporation.   All Rights Reserved.
-  * This file is part of HardFOC and is licensed under the GNU General Public License v3.0 or later.
-  *
-  */
+ * @file OsEventFlags.h
+ * @brief Lightweight C++ wrapper for the RTOS event-flag-group primitive.
+ *
+ * Thread-safety: internally thread-safe; the underlying FreeRTOS event group
+ * is already MT-safe, so no extra mutex is layered on top.
+ *
+ * Allocation: the underlying RTOS handle is created eagerly in the
+ * constructor; no heap allocation in `Set` / `Clear` / `Wait`.
+ *
+ * Public surface uses modern C++ types (`uint32_t`, `enum class WaitMode`) —
+ * no `OS_Ulong`, `OS_OR`, `OS_AND`, `OS_WAIT_FOREVER` leakage. Pass
+ * `UINT32_MAX` to wait forever.
+ */
 #ifndef OS_EVENT_FLAGS_H_
 #define OS_EVENT_FLAGS_H_
 
+#include <cstdint>
+#include <climits>
 #include "OsAbstraction.h"
-#include "Utility.h"
 #include "OsUtility.h"
 
-template <size_t groupSizeBytes>
+/**
+ * @enum WaitMode
+ * @brief Selects ANY-of-bits vs ALL-of-bits semantics for `Wait` calls.
+ */
+enum class WaitMode : uint8_t {
+    Any,  ///< Wake when any of the requested bits are set.
+    All,  ///< Wake only when all of the requested bits are set.
+};
+
+/**
+ * @class OsEventFlags
+ * @brief Eager-init event-flag group with modern C++ public surface.
+ *
+ * @tparam kReserved  Unused; kept for source compatibility. Pass anything.
+ */
+template <size_t kReserved = 1>
 class OsEventFlags {
 public:
-    /**
-     * @brief Construct a new OsEventFlags object.
-     *
-     * The constructor does not initialize the OS event flags or the mutex.
-     * The event flags and the mutex are initialized the first time an event is set or retrieved.
-     */
-    OsEventFlags(const char *groupName) :
-        initialized(false),
-        groupCreated(false),
-        mutexCreated(false),
-        name(groupName)
+    explicit OsEventFlags(const char* groupName) noexcept
+        : name_(groupName)
     {
-        /// No code at this time.
+        created_ = os_event_flags_create_ex(group_, name_);
     }
 
-    /**
-     * @brief Destroy the OsEventFlags object.
-     *
-     * If the event flags have been initialized, they are deleted.
-     * If the mutex has been initialized, it is deleted.
-     */
-    ~OsEventFlags() {
-        if (groupCreated) {
-            os_event_flags_delete_ex(group);
-        }
-        if (mutexCreated) {
-            os_mutex_delete_ex(mtx);
-        }
-    }
+    OsEventFlags(const OsEventFlags&) = delete;
+    OsEventFlags& operator=(const OsEventFlags&) = delete;
 
-    bool EnsureInitialized() noexcept
+    ~OsEventFlags() noexcept
     {
-        if (!initialized)
-        {
-            initialized = Initialize();
+        if (created_) {
+            os_event_flags_delete_ex(group_);
         }
-        return initialized;
+    }
+
+    /// True if the underlying RTOS handle was created successfully.
+    [[nodiscard]] bool IsValid() const noexcept { return created_; }
+
+    /**
+     * @brief Set @p bits in the group.
+     */
+    bool Set(uint32_t bits) noexcept
+    {
+        if (!created_) return false;
+        return os_event_flags_set_ex(group_, static_cast<OS_Ulong>(bits));
     }
 
     /**
-     * @brief Set event flags.
-     *
-     * If the event flags have not been initialized, they are initialized before the event is set.
-     *
-     * @param flagsToSet The flags to set.
+     * @brief Clear @p bits in the group.
      */
-    bool Set(OS_Ulong flagsToSet) noexcept {
-        if (EnsureInitialized()) {
-            MutexGuard guard((OS_Mutex*)&mtx);
-            return os_event_flags_set_ex(group, flagsToSet);
-        }
-        return false;
+    bool Clear(uint32_t bits) noexcept
+    {
+        if (!created_) return false;
+        return os_event_flags_clear_ex(group_, static_cast<OS_Ulong>(bits));
     }
 
     /**
-     * @brief Get event flags.
+     * @brief Wait for @p bits to be set per @p mode, up to @p timeout_ms.
      *
-     * If the event flags have not been initialized, they are initialized before the event is retrieved.
+     * Bits are NOT cleared on return.
      *
-     * @return The retrieved flags.
+     * @param[in]  bits        Bit mask to wait for.
+     * @param[in]  mode        ANY or ALL semantics.
+     * @param[in]  timeout_ms  Max wait in ms; pass `UINT32_MAX` to wait forever.
+     * @param[out] actual_bits Bits seen at wake-time (for ANY mode caller can
+     *                         tell which fired).
+     * @return true on success (bits satisfied), false on timeout.
      */
-    bool Get(OS_Ulong& flagsToGet, OS_Uint getOption, OS_Ulong wait_option = OS_NO_WAIT) noexcept {
-        OS_Ulong actualFlags;
-        if (EnsureInitialized()) {
-            MutexGuard guard((OS_Mutex*)&mtx);
-            return os_event_flags_get_ex(group, flagsToGet, getOption, actualFlags, wait_option);
-        }
-        return false;
+    bool Wait(uint32_t bits, WaitMode mode, uint32_t timeout_ms,
+              uint32_t& actual_bits) noexcept
+    {
+        actual_bits = 0;
+        if (!created_) return false;
+        OS_Ulong actual = 0;
+        const OS_Uint option = (mode == WaitMode::All)
+                                   ? static_cast<OS_Uint>(OS_AND)
+                                   : static_cast<OS_Uint>(OS_OR);
+        const bool ok = os_event_flags_get_ex(group_, static_cast<OS_Ulong>(bits),
+                                              option, actual, ToTicks(timeout_ms));
+        actual_bits = static_cast<uint32_t>(actual);
+        return ok;
     }
 
 private:
-    bool Initialize() noexcept
+    static OS_Ulong ToTicks(uint32_t timeout_ms) noexcept
     {
-        if(!mutexCreated) {
-            mutexCreated = os_mutex_create_ex(mtx, mutexName, OS_INHERIT);
-        }
-
-        if(!groupCreated) {
-            groupCreated = os_event_flags_create_ex(group, name);
-        }
-        return mutexCreated && groupCreated;
+        return (timeout_ms == UINT32_MAX)
+            ? static_cast<OS_Ulong>(OS_WAIT_FOREVER)
+            : static_cast<OS_Ulong>(os_convert_msec_to_delay_ticks(timeout_ms));
     }
 
-    bool initialized; ///< Whether the event flags have been initialized
-    bool groupCreated;
-    bool mutexCreated;
-    const char *name;
-
-    OS_EventGroup group; 	///< The OS event flags
-
-    OS_Mutex mtx;
-    static const char mutexName[];
-
-    static constexpr bool verbose = true;
-
+    const char*   name_;
+    bool          created_{false};
+    OS_EventGroup group_{};
 };
 
-template <size_t groupSizeBytes>
-const char OsEventFlags<groupSizeBytes>::mutexName[] = "OsEventFlags-Mutex";
-
-
-
 #endif /* OS_EVENT_FLAGS_H_ */
+

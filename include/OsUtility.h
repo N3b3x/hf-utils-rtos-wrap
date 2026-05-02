@@ -1,19 +1,41 @@
 /**
-  * Nebula Tech Corporation
-  *
-  * Copyright © 2023 Nebula Tech Corporation.   All Rights Reserved.
- * This file is part of HardFOC and is licensed under the GNU General Public License v3.0 or later.
-  *
-  *  Contains the declaration and definition of the utility functions related to
-  *     the generic OS..
-  *
-  *   Note:  These functions are not thread or interrupt-safe and should be called
-  *          called with appropriate guards if used within an ISR or shared between tasks.
-*/
+ * @file OsUtility.h
+ * @brief C-facing helper functions for delays, cycle counters, and creation
+ *        of RTOS handles (queues, event groups, timers, mutexes, stream
+ *        buffers).
+ *
+ * Sits on top of OsAbstraction.h and exposes a stable, RTOS-agnostic
+ * surface that the C++ wrappers (`OsQueue`, `OsEventFlags`, `Mutex`,
+ * `BaseThread`, ...) build on.
+ *
+ * Thread-safety: each function is a thin pass-through to the underlying
+ * RTOS primitive. Most are safe from any task context; the ones that wrap
+ * `xQueue*` / `xEventGroup*` inherit the safety contract of the FreeRTOS
+ * primitive. ISR-safe variants are documented on the individual functions.
+ *
+ * Allocation: the `*_create_*` helpers allocate the underlying RTOS object
+ * once. Steady-state operations (delay, cycle counts, send / receive) do
+ * not allocate.
+ *
+ * @todo Add @copyright line once project copyright wording is finalised.
+ */
 #ifndef OS_UTILITY_H_
 #define OS_UTILITY_H_
 
 #include "OsAbstraction.h"
+
+/**
+ * @enum time_unit_t
+ * @brief Units used to express time values.
+ *
+ * Defined here (not in Utility.h) so that C-facing function declarations
+ * below can reference it without a circular include.
+ */
+enum time_unit_t {
+    TIME_UNIT_US = 0,  /**< Microseconds */
+    TIME_UNIT_MS,      /**< Milliseconds */
+    TIME_UNIT_S        /**< Seconds */
+};
 
 #define UTIL_SYSTEM_CLOCK (240000000.0)	//240MHz
 
@@ -48,9 +70,6 @@ uint32_t os_get_elapsed_time_msec();
 #endif
 
 #endif /* HF_RTOS_FREERTOS */
-
-// Include after function declarations to avoid circular dependency
-#include "Utility.h"
 
 // ── Portable constexpr conversion utilities (work regardless of RTOS) ────
 /**

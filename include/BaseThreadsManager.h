@@ -1,15 +1,23 @@
 /**
-  * Nebula Tech Corporation
-  *
-  * Copyright © 2023 Nebula Tech Corporation.   All Rights Reserved.
- * This file is part of HardFOC and is licensed under the GNU General Public License v3.0 or later.
-  *
-  * Contains the declaration of "singleton" class MwSubThreadsManager that can access and control
-  * all HAL sub-threads.
-  */
+ * @file BaseThreadsManager.h
+ * @brief Optional registry that starts / stops a group of `BaseThread`
+ *        instances together.
+ *
+ * Useful when several worker threads share a lifecycle (e.g. all
+ * middleware sub-threads brought up at boot and torn down on shutdown).
+ *
+ * Thread-safety: the registry is guarded by an internal mutex; callers may
+ * register / start / stop from any task context.
+ *
+ * Allocation: the registry uses `std::map`, so each registration allocates
+ * once. The threads themselves never allocate stack — the caller supplies
+ * each `BaseThread`'s stack buffer.
+ *
+ * @todo Add @copyright line once project copyright wording is finalised.
+ */
 
-#ifndef UTILITIES_COMMON_BASETHREADSMANAGER_H_
-#define UTILITIES_COMMON_BASETHREADSMANAGER_H_
+#ifndef HF_UTILS_RTOS_WRAP_BASETHREADSMANAGER_H_
+#define HF_UTILS_RTOS_WRAP_BASETHREADSMANAGER_H_
 
 #include <map>
 #include <bitset>
@@ -672,4 +680,4 @@ bool BaseThreadsManager<EnumType, MaxCount>::Initialize() noexcept
 template <typename EnumType, EnumType MaxCount>
 const char BaseThreadsManager<EnumType, MaxCount>::mutexName[] = "BaseThreadManager-Mutex";
 
-#endif /* UTILITIES_COMMON_BASETHREADSMANAGER_H_ */
+#endif /* HF_UTILS_RTOS_WRAP_BASETHREADSMANAGER_H_ */

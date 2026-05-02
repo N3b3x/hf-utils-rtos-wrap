@@ -1,15 +1,22 @@
 /**
  * @file Mutex.h
- * @brief Mutex class definition.
+ * @brief Named-mutex wrapper used by `BaseThread` infrastructure.
  *
- * Nebula Tech Corporation
+ * The `Mutex` class wraps a dynamically created RTOS mutex with a name for
+ * debugging. The handle is created in the constructor and destroyed when
+ * the `Mutex` object goes out of scope.
  *
- * Copyright © 2023 Nebula Tech Corporation. All Rights Reserved.
- * This file is part of HardFOC and is licensed under the GNU General Public License v3.0 or later.
+ * Thread-safety: lock / unlock are safe from any task context (FreeRTOS
+ * mutex). Not ISR-safe — use `RtosMutex` or a critical section for ISRs.
  *
- * The Mutex class provides wrapper for a "named" mutex that is created dynamically
- *    created. When the Mutex object goes out of scope, the threadX mustex is deleted.
+ * Allocation: one RTOS mutex handle is allocated on construction; no
+ * allocation in `Lock` / `Unlock`.
  *
+ * For `std::lock_guard` compatibility use `RtosMutex` (see `RtosMutex.h`);
+ * this class is the named-handle variant intended for `BaseThread`
+ * infrastructure that exposes the handle by name.
+ *
+ * @todo Add @copyright line once project copyright wording is finalised.
  */
 
 #ifndef MUTEX_H

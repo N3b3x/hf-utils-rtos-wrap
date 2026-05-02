@@ -1,4 +1,4 @@
-[⬅️ Previous](Console.md) | [🗂️ Index](index.md) | [➡️ Next](Timers.md)
+[⬅️ Previous](GenericTemplates.md) | [🗂️ Index](index.md) | [➡️ Next](Timers.md)
 
 # RTOS Abstraction Layer 🎛️
 
@@ -14,4 +14,4 @@ This wrapper targets FreeRTOS kernel version 11.1.x and is designed to match its
 - Thin wrappers only; there is very little overhead.
 - Designed for portability to other RTOSes.
 
-[⬅️ Previous](Console.md) | [🗂️ Index](index.md) | [➡️ Next](Timers.md)
+[⬅️ Previous](GenericTemplates.md) | [🗂️ Index](index.md) | [➡️ Next](Timers.md)

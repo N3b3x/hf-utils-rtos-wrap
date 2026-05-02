@@ -2,15 +2,10 @@
  * @file BaseThread.cpp
  * @brief Implementation of the BaseThread class.
  *
- * Nebula Tech Corporation
- *
- * Copyright © 2023 Nebula Tech Corporation.   All Rights Reserved.
- * This file is part of HardFOC and is licensed under the GNU General Public
- * License v3.0 or later.
- *
  * This source file implements the BaseThread abstraction which provides the
  * common infrastructure for service and clinical threads. Refer to
  * BaseThread.h for a detailed description of the class design and usage.
+ * @todo Add @copyright line once project copyright wording is finalised.
  */
 
 #include "BaseThread.h"

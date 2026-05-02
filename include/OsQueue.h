@@ -1,138 +1,101 @@
 /**
  * @file OsQueue.h
- * @brief Lightweight C++ wrapper for Generic queues.
+ * @brief Lightweight C++ wrapper for the RTOS queue primitive.
  *
- * Nebula Tech Corporation
+ * Thread-safety: internally thread-safe; the underlying FreeRTOS queue is
+ * already MT-safe so no extra mutex is layered on top.
  *
- * Copyright © 2023 Nebula Tech Corporation.   All Rights Reserved.
- * This file is part of HardFOC and is licensed under the GNU General Public
- * License v3.0 or later.
+ * Allocation: queue storage is held inline as a fixed-capacity member array;
+ * no heap allocation. The underlying RTOS queue handle is created eagerly in
+ * the constructor.
  *
- * This header defines a templated queue class that lazily creates the
- * underlying RTOS queue and associated mutex the first time it is used. The
- * interface mimics a subset of the OS queue API and is used across the
- * utility layer for inter-thread communication.
+ * Public surface uses modern C++ types — `uint32_t timeout_ms`, `bool`. No
+ * `OS_Ulong` / `OS_WAIT_FOREVER` leakage. Pass `UINT32_MAX` to wait forever.
  */
 #ifndef OS_QUEUE_H_
 #define OS_QUEUE_H_
 
+#include <cstdint>
+#include <cstddef>
+#include <climits>
 #include "OsAbstraction.h"
-#include "Utility.h"
 #include "OsUtility.h"
 
 /**
  * @class OsQueue
- * @brief This class provides a C++ interface to a OS queue.
+ * @brief Fixed-capacity, eager-init MPMC queue of trivially-copyable items.
  *
- * The OS queue is lazily initialized the first time a message is sent or received.
+ * @tparam MessageType  Element type (must be trivially copyable; passed by
+ *                      value through the underlying queue).
+ * @tparam kCapacity    Maximum number of pending elements.
  */
-template <typename MessageType, size_t queueSizeBytes>
+template <typename MessageType, size_t kCapacity>
 class OsQueue {
 public:
-	/**
-	 * @brief Construct a new OsQueue object.
-	 *
-	 * The constructor does not initialize the OS queue or the mutex.
-	 * The queue and the mutex are initialized the first time a message is sent or received.
-	 */
-	OsQueue(const char *queueName, uint32_t messageSizeInWordsArg) :
-		initialized(false),
-		queueCreated(false),
-		mutexCreated(false),
-		name(queueName),
-		messageSizeInWords(messageSizeInWordsArg)
-	{
-		/// No code at this time.
-	}
-
     /**
-     * @brief Destroy the OsQueue object.
-     *
-     * If the queue has been initialized, it is deleted.
-     * If the mutex has been initialized, it is deleted.
+     * @brief Construct and create the underlying RTOS queue eagerly.
      */
-    ~OsQueue() {
-    	if (queueCreated) {
-    		os_queue_delete_ex(queue);
-    	}
-    	if (mutexCreated) {
-    		os_mutex_delete_ex(mtx);
-    	}
+    explicit OsQueue(const char* queueName) noexcept
+        : name_(queueName)
+    {
+        constexpr OS_Uint kItemWords =
+            static_cast<OS_Uint>((sizeof(MessageType) + sizeof(uint32_t) - 1U) / sizeof(uint32_t));
+        created_ = os_queue_create_ex(queue_, name_, kItemWords,
+                                      storage_, sizeof(storage_));
     }
 
-	bool EnsureInitialized() noexcept
-	{
-		if (!initialized)
-		{
-			initialized = Initialize();
-		}
-		return initialized;
-	}
+    OsQueue(const OsQueue&) = delete;
+    OsQueue& operator=(const OsQueue&) = delete;
 
-    /**
-     * @brief Send a message to the queue.
-     *
-     * If the queue has not been initialized, it is initialized before the message is sent.
-     *
-     * @param message The message to send.
-     */
-    bool Send(MessageType message, OS_Ulong wait_option = OS_WAIT_FOREVER) noexcept {
-        if (EnsureInitialized()) {
-        	MutexGuard guard((OS_Mutex*)&mtx);
-        	return os_queue_send_ex(queue, &message, wait_option);
+    ~OsQueue() noexcept
+    {
+        if (created_) {
+            os_queue_delete_ex(queue_);
         }
-        return false;
+    }
+
+    /// True if the underlying RTOS queue was created successfully.
+    [[nodiscard]] bool IsValid() const noexcept { return created_; }
+
+    /**
+     * @brief Send a message; blocks up to @p timeout_ms.
+     * @return true on success, false on timeout / failure.
+     */
+    bool Send(const MessageType& message, uint32_t timeout_ms = UINT32_MAX) noexcept
+    {
+        if (!created_) return false;
+        MessageType local = message;
+        return os_queue_send_ex(queue_, &local, ToTicks(timeout_ms));
     }
 
     /**
-     * @brief Receive a message from the queue.
-     *
-     * If the queue has not been initialized, it is initialized before the message is received.
-     *
-     * @return The received message.
+     * @brief Receive a message; blocks up to @p timeout_ms.
+     * @return true on success, false on timeout / failure.
      */
-    bool Receive(MessageType& message, OS_Ulong wait_option = OS_WAIT_FOREVER) noexcept {
-        MessageType tmpMessage;
-        if (EnsureInitialized()) {
-        	MutexGuard guard((OS_Mutex*)&mtx);
-        	return os_queue_receive_ex(queue, &message, wait_option);
-        }
-        return false;
+    bool Receive(MessageType& out, uint32_t timeout_ms = UINT32_MAX) noexcept
+    {
+        if (!created_) return false;
+        return os_queue_receive_ex(queue_, &out, ToTicks(timeout_ms));
     }
+
+    /**
+     * @brief Compile-time capacity in elements.
+     */
+    [[nodiscard]] static constexpr size_t Capacity() noexcept { return kCapacity; }
 
 private:
-	bool Initialize() noexcept
-	{
-		if(!mutexCreated) {
-			mutexCreated = os_mutex_create_ex(mtx, mutexName, OS_INHERIT);
-		}
+    static OS_Ulong ToTicks(uint32_t timeout_ms) noexcept
+    {
+        return (timeout_ms == UINT32_MAX)
+            ? static_cast<OS_Ulong>(OS_WAIT_FOREVER)
+            : static_cast<OS_Ulong>(os_convert_msec_to_delay_ticks(timeout_ms));
+    }
 
-		if(!queueCreated) {
-			queueCreated = os_queue_create_ex(queue, name, messageSizeInWords, queue_storage, sizeof(queue_storage));
-		}
-		return mutexCreated && queueCreated;
-	}
-
-    bool initialized; ///< Whether the queue has been initialized
-    bool queueCreated;
-    bool mutexCreated;
-    const char *name;
-    uint32_t messageSizeInWords;
-
-    OS_Queue queue; 	///< The OS queue
-
-    OS_Mutex mtx;
-    static const char mutexName[];
-
-    MessageType queue_storage[queueSizeBytes]; ///< The storage for the queue
-	//==============================================================//
-	// VERBOSE??
-	//==============================================================//
-	static constexpr bool verbose = true;
-
+    const char* name_;
+    bool        created_{false};
+    OS_Queue    queue_{};
+    MessageType storage_[kCapacity];
 };
 
-template <typename MessageType, size_t queueSizeBytes>
-const char OsQueue<MessageType, queueSizeBytes>::mutexName[] = "OsQueue-Mutex";
-
 #endif /* OS_QUEUE_H_ */
+
